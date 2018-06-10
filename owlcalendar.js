@@ -125,7 +125,7 @@ function getMatchSummaryString(options, stageName, match, compet1, compet2) {
 		var abbr2 = getAbbreviatedName(compet2);
 		summary = "OWL " + abbr1 + score1 + vs + abbr2 + score2;
 	}
-	console.log(summary);
+	//console.log(summary);
 	return summary;
 }
 
