@@ -229,7 +229,8 @@ exports.serveIndex = function(clientIp, request, response) {
 	fs.readFile('./index.html', function(err, data) {
 		response.end(data);
 	});
-	console.log(clientIp +  " Serving index for " + request.url);
+	var requestTime = new Date();
+	console.log(requestTime.toString() + " " + clientIp +  " " + request.url + " Serving index page.");
 }; 
 
 function getFilteredTeams(pars) {
@@ -286,9 +287,9 @@ exports.serveOwlIcal = function(request, response) {
 	var options = getOptions(request);
 
 	if (options.showAllTeams()) {
-		console.log(requestTime.toString() + " " + clientIp + " Returning all teams.");
+		console.log(requestTime.toString() + " " + clientIp +  " " + request.url + " Returning all teams.");
 	} else {
-		console.log(requestTime.toString() + " " + clientIp + " Returning only teams " + options.teams);
+		console.log(requestTime.toString() + " " + clientIp +  " " + request.url + " Returning only teams " + options.teams);
 	}
 
 	ensureDataLoaded(function() {
