@@ -14,7 +14,11 @@ function serveCalendar(request, response) {
 
 function onRequest(request, response) {
 	if (request.url.startsWith('/calendar')) {
-		serveCalendar(request, response);
+		try {
+			serveCalendar(request, response);
+		} catch (exception) {
+			console.log("Exception while serving calendar: " + exception);
+		}
 	} else {
 		var ipInfo = getIP(request);
 		var clientIp = ipInfo.clientIp;
