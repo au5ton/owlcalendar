@@ -95,20 +95,37 @@ function getAbbreviatedName(competitor) {
 }
 
 function getMatchSummaryString(options, stageName, match, compet1, compet2) {
+	var score1 = "", score2 = "";
+	var vs = options.format == FORMAT_DETAILED ? " vs " : " v ";
+	if (options.showScores() && strcasecmp(match.state, "CONCLUDED")) {
+		if (strcasecmp(match.winner.abbreviatedName, compet2.abbreviatedName)) {
+			var compTmp = compet2;
+			compet2 = compet1;
+			compet1 = compTmp;
+			score1 = " [" + match.scores[1].value + "]";
+			score2 = " [" + match.scores[0].value + "]";
+		} else {
+			score1 = " [" + match.scores[0].value + "]";
+			score2 = " [" + match.scores[1].value + "]";
+		 }
+		 vs = " d ";
+	}
+
 	var summary;
 	if (options.format == FORMAT_DETAILED) {
 		summary = stageName;
 		if (match.tournament.type == 'PLAYOFFS') {
 			summary += ' Playoffs';
 		}
-		var comp1 = compet1 == null ? "TBA" : compet1.name;
-		var comp2 = compet2 == null ? "TBA" : compet2.name;
-		summary += " - " + comp1 + " vs " + comp2;
+		var comp1 = compet1 == null ? "TBA" : compet1.name + score1;
+		var comp2 = compet2 == null ? "TBA" : compet2.name + score2;
+		summary += " - " + comp1 + vs + comp2;
 	} else {
 		var abbr1 = getAbbreviatedName(compet1);
 		var abbr2 = getAbbreviatedName(compet2);
-		summary = "OWL " + abbr1 + " v " + abbr2;
+		summary = "OWL " + abbr1 + score1 + vs + abbr2 + score2;
 	}
+	console.log(summary);
 	return summary;
 }
 
@@ -161,6 +178,7 @@ function parseMatchesInto(stageName, match, ical, options) {
 			var description = getMatchDescriptionString(stageName, match, competitors[0], competitors[1]);
 			
 			var event = ical.createEvent({
+				id: match.id,
 				summary: summary,
 				description: description,
 				start: match.startDate,
@@ -184,6 +202,7 @@ exports.getCalendar = function(calData, response, teams) {
 
 function buildCalendar(options) {
 	var ical = icalgen().ttl(60*60*24);
+	ical.domain("owlcalendar");
 
 	var stages = calendarData.data.stages;
 	for (var i = 0;i < stages.length;i++) {
@@ -244,7 +263,7 @@ function getOptions(request) {
 
 	var options = {
 		format: pars.format != null && strcasecmp(pars.format, PARAM_FORMAT_DETAILED) ? FORMAT_REGULAR: FORMAT_DETAILED,
-		scores: pars.scores != null && strcasecmp(pars.scores, PARAM_SCORES_SHOW) ? SHOW_SCORES : 0,
+		scores: pars.scores != null && (strcasecmp(pars.scores, PARAM_SCORES_SHOW) || strcasecmp(pars.scores, "true")) ? SHOW_SCORES : 0,
 		teams: teams,
 		
 		showAllTeams: function() {
@@ -252,6 +271,9 @@ function getOptions(request) {
 				return true;
 			}
 			return false;
+		},
+		showScores: function() {
+			return this.scores == SHOW_SCORES;
 		}
 	}
 	return options;
