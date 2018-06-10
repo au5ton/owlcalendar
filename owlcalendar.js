@@ -267,10 +267,10 @@ function getOptions(request) {
 		teams: teams,
 		
 		showAllTeams: function() {
-			if (teams != null && teams.length <= 0) {
+			if (this.teams == null || this.teams.length <= 0) {
 				return true;
 			}
-			return false;
+			return true;
 		},
 		showScores: function() {
 			return this.scores == SHOW_SCORES;
