@@ -171,6 +171,13 @@ var params=function (req) {
   return result;
 }
 
+exports.serveIndex = function(clientIp, request, response) {
+	fs.readFile('./index.html', function(err, data) {
+		response.end(data);
+	});
+	console.log(clientIp +  " Serving index for " + request.url);
+}; 
+
 exports.getFilteredTeams = function(request) {
 	var pars = params(request);
 	var teams = null;

@@ -8,10 +8,9 @@ var getIP = require('ipware')().get_ip;
 const hostname = '0.0.0.0';
 const port = 3000;
 
-function onRequest(request, response) {
+function serveCalendar(request, response) {
 	var ipInfo = getIP(request);
 	var clientIp = ipInfo.clientIp;
-	
 	var teams = owl.getFilteredTeams(request);
 	if (teams) {
 		console.log(clientIp + " Returning only teams " + teams);
@@ -19,6 +18,17 @@ function onRequest(request, response) {
 		console.log(clientIp + " Returning all teams.");
 	}
 	owl.serveOwlIcal(response, teams);
+}
+
+function onRequest(request, response) {
+	if (request.url.startsWith('/calendar')) {
+		serveCalendar(request, response);
+	} else {
+		var ipInfo = getIP(request);
+		var clientIp = ipInfo.clientIp;
+	
+		owl.serveIndex(clientIp, request, response);
+	}
 }
 
 const server = http.createServer(onRequest);
