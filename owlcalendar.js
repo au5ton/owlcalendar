@@ -3,10 +3,11 @@
 var fs = require('fs');
 var icalgen = require('ical-generator');
 var calendarData;
-var ical = icalgen().ttl(60*60*24);
 var request = require('request');
 
-var calendarCachedFile = 'calendar.json';
+const cacheHours = 12;
+const maxCacheTime = cacheHours * 60 * 60 * 1000;
+const calendarCachedFile = 'calendar.json';
 const calendarUrl = 'https://api.overwatchleague.com/schedule?expand=team.content&locale=en_US';
 
 if (!Array.prototype.indexOf) {
@@ -24,34 +25,46 @@ if (!Array.prototype.indexOf) {
 	};
 }
 
-function readFilesystemCalendar(onDataRetrieved, response, teams) {
+function readFilesystemCalendar(onCalendarDataLoaded) {
 	fs.readFile(calendarCachedFile, 'utf8', function (err, data) {
 		if (err) {
-			return console.log("Error retrieving calendar.json: " + err);
+			return console.log("Error retrieving " + calendarCachedFile + ": " + err);
 		} else {
-			console.log("Calendar data retrieved.");
+			console.log("Calendar data retrieved from " + calendarCachedFile);
 			calendarData = JSON.parse(data);
-			//console.debug("Calling function " + onDataRetrieved); 
-			onDataRetrieved(calendarData, response, teams);
+			//console.debug("Calling function " + onCalendarDataLoaded); 
+			onCalendarDataLoaded(calendarData);
 		}
 	});
 }
 
-exports.getCachedData = function(onDataRetrieved, response, teams) {
+exports.getCachedData = function(onCalendarDataLoaded) {
 	if (calendarData == null) {
-		console.log("Loading calendar data.");
 		if (!fs.existsSync(calendarCachedFile)) {
 			console.log("Reading remote calendar file from " + calendarUrl);
 			request(calendarUrl, function (error, calXhrResponse, body) {
-				readFilesystemCalendar(onDataRetrieved, response, teams);
+				readFilesystemCalendar(onCalendarDataLoaded);
 			}).pipe(fs.createWriteStream(calendarCachedFile));
 		} else {
 			//console.debug("File " + calendarCachedFile + " already exists, reading immediately from disk.");
-			readFilesystemCalendar(onDataRetrieved, response, teams);
+			var stats = fs.statSync(calendarCachedFile);
+			var modifiedTime = new Date(stats.mtime);
+			// if cache data is older than timeout, get from URL, else read cache.
+			var timeNow = new Date();
+			var age = timeNow.getMilliseconds() - modifiedTime.getMilliseconds();
+			
+			if (age > maxCacheTime) {
+				console.log("Data on disk is older than max age, retriving fresh from URL.");
+				request(calendarUrl, function (error, calXhrResponse, body) {
+					readFilesystemCalendar(onCalendarDataLoaded);
+				}).pipe(fs.createWriteStream(calendarCachedFile));
+			} else {
+				readFilesystemCalendar(onCalendarDataLoaded);
+			}
 		}
 	} else {
 		console.log("Calendar data already loaded.");
-		onDataRetrieved(calendarData, response);
+		onCalendarDataLoaded();
 	}
 };
 
@@ -133,6 +146,17 @@ exports.getCalendar = function(calData, response, teams) {
 	ical.serve(response);
 };
 
+function buildCalendar(teams) {
+	var ical = icalgen().ttl(60*60*24);
+
+	var stages = calendarData.data.stages;
+	
+	for (var i = 0;i < stages.length;i++) {
+		parseStageInto(stages[i], ical, teams);
+	}
+	return ical;
+}
+
 var params=function (req) {
   let q=req.url.split('?'),result={};
   if(q.length>=2){
@@ -156,7 +180,16 @@ exports.getFilteredTeams = function(request) {
 	return teams;
 }
 
-exports.getOwlIcal = function(response, teams) {
-	exports.getCachedData(exports.getCalendar, response, teams);
+function ensureDataLoaded(callback) {
+	exports.getCachedData(callback);
+}
+
+exports.serveOwlIcal = function(response, teams) {
+	ensureDataLoaded(function() {
+		var ical = buildCalendar(teams);
+		ical.serve(response);
+	});
 };
 
+ensureDataLoaded(function() {});
+console.log("OWLCalendar module loaded.");

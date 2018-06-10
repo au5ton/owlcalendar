@@ -18,7 +18,7 @@ function onRequest(request, response) {
 	} else {
 		console.log(clientIp + " Returning all teams.");
 	}
-	owl.getOwlIcal(response, teams);
+	owl.serveOwlIcal(response, teams);
 }
 
 const server = http.createServer(onRequest);
