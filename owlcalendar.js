@@ -4,11 +4,18 @@ var fs = require('fs');
 var icalgen = require('ical-generator');
 var calendarData;
 var request = require('request');
+var getIP = require('ipware')().get_ip;
 
 const cacheHours = 12;
 const maxCacheTime = cacheHours * 60 * 60 * 1000;
 const calendarCachedFile = 'calendar.json';
 const calendarUrl = 'https://api.overwatchleague.com/schedule?expand=team.content&locale=en_US';
+
+const FORMAT_REGULAR = "1";
+const FORMAT_DETAILED = "2";
+const SHOW_SCORES = "4";
+const PARAM_SCORES_SHOW = 'SHOW';
+const PARAM_FORMAT_DETAILED = 'DETAILED';
 
 if (!Array.prototype.indexOf) {
 	Array.prototype.indexOf = function (obj, fromIndex) {
@@ -68,10 +75,10 @@ exports.getCachedData = function(onCalendarDataLoaded) {
 	}
 };
 
-function parseStageInto(stage, ical, filteredTeams) {
+function parseStageInto(stage, ical, options) {
 	var matches = stage.matches;
 	for (var i = 0;i < matches.length;i++) {
-		parseMatchesInto(stage.name, matches[i], ical, filteredTeams);
+		parseMatchesInto(stage.name, matches[i], ical, options);
 	}
 }
 
@@ -87,41 +94,72 @@ function getAbbreviatedName(competitor) {
 	return abbr;
 }
 
-function parseMatchesInto(stageName, match, ical, filteredTeams) {
+function getMatchSummaryString(options, stageName, match, compet1, compet2) {
+	var summary;
+	if (options.format == FORMAT_DETAILED) {
+		summary = stageName;
+		if (match.tournament.type == 'PLAYOFFS') {
+			summary += ' Playoffs';
+		}
+		var comp1 = compet1 == null ? "TBA" : compet1.name;
+		var comp2 = compet2 == null ? "TBA" : compet2.name;
+		summary += " - " + comp1 + " vs " + comp2;
+	} else {
+		var abbr1 = getAbbreviatedName(compet1);
+		var abbr2 = getAbbreviatedName(compet2);
+		summary = "OWL " + abbr1 + " v " + abbr2;
+	}
+	return summary;
+}
+
+function getMatchDescriptionString(stageName, match,compet1, compet2) {
+	var description = stageName;
+	if (match.tournament.type == 'PLAYOFFS') {
+		description += ' Playoffs';
+	}
+	var comp1 = compet1 == null ? "TBA" : compet1.name;
+	var comp2 = compet2 == null ? "TBA" : compet2.name;
+	description += " - " + comp1 + " vs " + comp2;
+	return description;
+}
+
+function shouldShowMatch(options, competitors) {
+	var filteredTeams = options.teams;
+	var showMatch = true;
+	if (options.showAllTeams()) {
+		// filter to only show matches for teams in array.
+		showMatch = true;
+	} else {
+		var abbr1 = getAbbreviatedName(competitors[0]);
+		var abbr2 = getAbbreviatedName(competitors[1]);
+		if (filteredTeams.indexOf(abbr1) !== -1 || filteredTeams.indexOf(abbr2) !== -1) {
+			showMatch = true;
+		}
+		else {
+			showMatch = false;
+		}
+	}
+	return showMatch;
+}
+
+function parseMatchesInto(stageName, match, ical, options) {
+	var filteredTeams = options.teams;
+	
 	var competitors = match.competitors;
 	if (competitors.length < 2 || !competitors) {
 		console.log("Competitors in match was null: " + JSON.stringify(match));
-//	} else if (!competitors[0] == null || competitors[1] == null) {
-//		console.log("Competitors in match was null: " + JSON.stringify(match));
-//	} else if (!competitors[0].name || !competitors[1].name) {
-//		console.log("Competitor in match had no name: " + JSON.stringify(match));
 	} else {
 		var comp1 = competitors[0] == null ? "TBA" : competitors[0].name;
 		var comp2 = competitors[1] == null ? "TBA" : competitors[1].name;
 		var abbr1 = getAbbreviatedName(competitors[0]);
 		var abbr2 = getAbbreviatedName(competitors[1]);
 		
-		var showMatch = true;
-		if (filteredTeams == null || filteredTeams.length == 0) {
-			// filter to only show matches for teams in array.
-			showMatch = true;
-		} else {
-			if (filteredTeams.indexOf(abbr1) !== -1 || filteredTeams.indexOf(abbr2) !== -1) {
-				showMatch = true;
-			}
-			else {
-				showMatch = false;
-			}
-		}
+		var showMatch = shouldShowMatch(options, competitors);
 		
 		if (showMatch) {
-			var description = stageName;
-			var summary = "OWL ";
-			if (match.tournament.type == 'PLAYOFFS') {
-				description += ' Playoffs';
-			}
-			description += " - " + comp1 + " vs " + comp2;
-			summary += abbr1 + " v " + abbr2;
+			var summary = getMatchSummaryString(options, stageName, match, competitors[0], competitors[1]);
+			var description = getMatchDescriptionString(stageName, match, competitors[0], competitors[1]);
+			
 			var event = ical.createEvent({
 				summary: summary,
 				description: description,
@@ -130,8 +168,6 @@ function parseMatchesInto(stageName, match, ical, filteredTeams) {
 				sequence: match.id,
 				location: match.tournament.location
 			});
-	
-			//console.debug("Match " + match.id + " at " + match.startDate + ": " + summary);
 		}
 	}
 }
@@ -146,13 +182,12 @@ exports.getCalendar = function(calData, response, teams) {
 	ical.serve(response);
 };
 
-function buildCalendar(teams) {
+function buildCalendar(options) {
 	var ical = icalgen().ttl(60*60*24);
 
 	var stages = calendarData.data.stages;
-	
 	for (var i = 0;i < stages.length;i++) {
-		parseStageInto(stages[i], ical, teams);
+		parseStageInto(stages[i], ical, options);
 	}
 	return ical;
 }
@@ -178,8 +213,7 @@ exports.serveIndex = function(clientIp, request, response) {
 	console.log(clientIp +  " Serving index for " + request.url);
 }; 
 
-exports.getFilteredTeams = function(request) {
-	var pars = params(request);
+function getFilteredTeams(pars) {
 	var teams = null;
 	if (pars.teams) {
 		teams = pars.teams.split(',');
@@ -187,13 +221,56 @@ exports.getFilteredTeams = function(request) {
 	return teams;
 }
 
+function strcasecmp(string1, string2) {
+	if (string1 == null && string2 == null) {
+		return true;
+	}
+	if (string1 == null || string2 == null) {
+		return false;
+	}
+	string1 = string1.toLowerCase();
+	string2 = string2.toLowerCase();
+	
+	return string1 === string2;
+}
+
 function ensureDataLoaded(callback) {
 	exports.getCachedData(callback);
 }
 
-exports.serveOwlIcal = function(response, teams) {
+function getOptions(request) {
+	var pars = params(request);
+	var teams = getFilteredTeams(pars);
+
+	var options = {
+		format: pars.format != null && strcasecmp(pars.format, PARAM_FORMAT_DETAILED) ? FORMAT_REGULAR: FORMAT_DETAILED,
+		scores: pars.scores != null && strcasecmp(pars.scores, PARAM_SCORES_SHOW) ? SHOW_SCORES : 0,
+		teams: teams,
+		
+		showAllTeams: function() {
+			if (teams != null && teams.length <= 0) {
+				return true;
+			}
+			return false;
+		}
+	}
+	return options;
+}
+
+exports.serveOwlIcal = function(request, response) {
+	var ipInfo = getIP(request);
+	var clientIp = ipInfo.clientIp;
+	var requestTime = new Date();
+	var options = getOptions(request);
+
+	if (options.showAllTeams()) {
+		console.log(requestTime.toString() + " " + clientIp + " Returning all teams.");
+	} else {
+		console.log(requestTime.toString() + " " + clientIp + " Returning only teams " + options.teams);
+	}
+
 	ensureDataLoaded(function() {
-		var ical = buildCalendar(teams);
+		var ical = buildCalendar(options);
 		ical.serve(response);
 	});
 };

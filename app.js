@@ -9,15 +9,7 @@ const hostname = '0.0.0.0';
 const port = 3000;
 
 function serveCalendar(request, response) {
-	var ipInfo = getIP(request);
-	var clientIp = ipInfo.clientIp;
-	var teams = owl.getFilteredTeams(request);
-	if (teams) {
-		console.log(clientIp + " Returning only teams " + teams);
-	} else {
-		console.log(clientIp + " Returning all teams.");
-	}
-	owl.serveOwlIcal(response, teams);
+	owl.serveOwlIcal(request, response);
 }
 
 function onRequest(request, response) {
