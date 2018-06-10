@@ -1,0 +1,24 @@
+{
+  "name": "owlcalendar",
+  "version": "0.0.1",
+  "description": "Overwatch League calendar convertor",
+  "main": "owlcalendar.js",
+  "dependencies": {
+    "http-server": "^0.11.1",
+    "ical-generator": "^0.2.10",
+    "ipware": "^1.0.0",
+    "serve-handler": "^3.1.0"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "test"
+  },
+  "keywords": [
+    "OWL",
+    "Overwatch",
+    "Calendar"
+  ],
+  "author": "Tim Rowe <tim@tjsr.id.au>",
+  "license": "ISC",
+  "repository": "git@bitbucket.org:tjsrowe/owlcalendar.git"
+}
