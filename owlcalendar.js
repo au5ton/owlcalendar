@@ -5,6 +5,7 @@ var icalgen = require('ical-generator');
 var calendarData;
 var request = require('request');
 var getIP = require('ipware')().get_ip;
+var url = require('url');
 
 const cacheHours = 12;
 const maxCacheTime = cacheHours * 60 * 60 * 1000;
@@ -226,11 +227,22 @@ var params=function (req) {
 }
 
 exports.serveIndex = function(clientIp, request, response) {
-	fs.readFile('./index.html', function(err, data) {
-		response.end(data);
-	});
 	var requestTime = new Date();
-	console.log(requestTime.toString() + " " + clientIp +  " " + request.url + " Serving index page.");
+	var path = url.parse(request.url).pathname;
+	if (!strcasecmp(path, "/")) {
+		if (!response) {
+			console.log("No response object.");
+		} else {
+			response.writeHead(404, 'Not found');
+			response.end('Not found');
+			console.log(requestTime.toString() + " " + clientIp +  " " + request.url + " 404");
+		}
+	} else {
+		fs.readFile('./index.html', function(err, data) {
+			response.end(data);
+		});
+		console.log(requestTime.toString() + " " + clientIp +  " " + request.url + " Serving index page.");
+	}
 }; 
 
 function getFilteredTeams(pars) {
