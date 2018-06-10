@@ -4,7 +4,10 @@ var fs = require('fs');
 var icalgen = require('ical-generator');
 var calendarData;
 var ical = icalgen().ttl(60*60*24);
+var request = require('request');
 
+var calendarCachedFile = 'calendar.json';
+const calendarUrl = 'https://api.overwatchleague.com/schedule?expand=team.content&locale=en_US';
 
 if (!Array.prototype.indexOf) {
 	Array.prototype.indexOf = function (obj, fromIndex) {
@@ -21,18 +24,31 @@ if (!Array.prototype.indexOf) {
 	};
 }
 
+function readFilesystemCalendar(onDataRetrieved, response, teams) {
+	fs.readFile(calendarCachedFile, 'utf8', function (err, data) {
+		if (err) {
+			return console.log("Error retrieving calendar.json: " + err);
+		} else {
+			console.log("Calendar data retrieved.");
+			calendarData = JSON.parse(data);
+			//console.debug("Calling function " + onDataRetrieved); 
+			onDataRetrieved(calendarData, response, teams);
+		}
+	});
+}
+
 exports.getCachedData = function(onDataRetrieved, response, teams) {
 	if (calendarData == null) {
 		console.log("Loading calendar data.");
-		fs.readFile('calendar.json', 'utf8', function (err,data) {
-			if (err) {
-				return console.log("Error retrieving calendar.json: " + err);
-			} else {
-				console.log("Calendar data retrieved.");
-				calendarData = JSON.parse(data);
-				onDataRetrieved(calendarData, response, teams);
-			}
-		});
+		if (!fs.existsSync(calendarCachedFile)) {
+			console.log("Reading remote calendar file from " + calendarUrl);
+			request(calendarUrl, function (error, calXhrResponse, body) {
+				readFilesystemCalendar(onDataRetrieved, response, teams);
+			}).pipe(fs.createWriteStream(calendarCachedFile));
+		} else {
+			//console.debug("File " + calendarCachedFile + " already exists, reading immediately from disk.");
+			readFilesystemCalendar(onDataRetrieved, response, teams);
+		}
 	} else {
 		console.log("Calendar data already loaded.");
 		onDataRetrieved(calendarData, response);
