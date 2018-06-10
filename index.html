@@ -1,0 +1,31 @@
+<html>
+	<head>
+	<title>OWL Calendar</title>
+	</head>
+	<body>
+		<h1>Overwatch League ICS calendar</h1>
+		<h2>How-to</h2>
+		<p>This tool provides an ics feed for the Overwatch League calendar.  It takes the data feed Blizzard provide from their API and converts it to a format that you can use applications such a Google Calendar to embed a calendar in to.  Parameters can be added to limit or format the data as you want them to be displayed.</p>
+		<h2>Example format</h2>
+		<p>To get all calendar data in the basic format, use <a href="/calendar">/calendar</a></p>
+		<h3>Limiting to teams</h3>
+		<p>To limit the data to only matches that are contested by one or more teams, add the <strong>teams</strong> parameter, with the three-letter abbreviation separated by a comma.</p>
+		<p>eg, <strong><a href="/calendar?teams=LAV,NYE,BOS">/calendar?teams=LAV,NYE,BOS</a></strong> will give a feed featuring only games in which Los Angeles Valiant, New York Excelsior, and Boston Uprising are participating in, plus all finals in which the competitors are unknown.</p>
+		<p>Valid values are:
+			<ul>
+				<li>BOS - Boston Uprising</li>
+				<li>GLA - Los-Angeles Gladiators</li>
+				<li>VAL - Los Angeles Valiant</li>
+				<li>FLA/FM - Florida Mayhem</li>
+				<li>SFS - San Francisco Shock</li>
+				<li>SEO - Seoul Dynasty</li>
+				<li>SHD - Shanghai Dragons</li>
+				<li>LDN/LS - London Spitfire</li>
+				<li>DAL - Dallas Fuel</li>
+				<li>HOU/HO - Houston Outlaws</li>
+				<li>NYE - New York Excelsior</li>
+				<li>PHI/PF - Philadeliphia Fusion</li>
+			</ul>
+		</p>
+	</body>
+</html>
