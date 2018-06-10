@@ -70,7 +70,7 @@ exports.getCachedData = function(onCalendarDataLoaded) {
 			}
 		}
 	} else {
-		console.log("Calendar data already loaded.");
+		//console.log("Calendar data already loaded.");
 		onCalendarDataLoaded();
 	}
 };
