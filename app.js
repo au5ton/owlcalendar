@@ -20,10 +20,14 @@ function onRequest(request, response) {
 			console.log("Exception while serving calendar: " + exception);
 		}
 	} else {
-		var ipInfo = getIP(request);
-		var clientIp = ipInfo.clientIp;
+		try {
+			var ipInfo = getIP(request);
+			var clientIp = ipInfo.clientIp;
 	
-		owl.serveIndex(clientIp, request, response);
+			owl.serveIndex(clientIp, request, response);
+		} catch (exception) {
+			console.log("Exception while serving index: " + exception);
+		}
 	}
 }
 
