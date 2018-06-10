@@ -262,7 +262,7 @@ function getOptions(request) {
 	var teams = getFilteredTeams(pars);
 
 	var options = {
-		format: pars.format != null && strcasecmp(pars.format, PARAM_FORMAT_DETAILED) ? FORMAT_REGULAR: FORMAT_DETAILED,
+		format: pars.format != null && !strcasecmp(pars.format, PARAM_FORMAT_DETAILED) ? FORMAT_REGULAR: FORMAT_DETAILED,
 		scores: pars.scores != null && (strcasecmp(pars.scores, PARAM_SCORES_SHOW) || strcasecmp(pars.scores, "true")) ? SHOW_SCORES : 0,
 		teams: teams,
 		
