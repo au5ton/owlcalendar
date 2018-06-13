@@ -59,7 +59,7 @@ exports.getCachedData = function(onCalendarDataLoaded) {
 			var modifiedTime = new Date(stats.mtime);
 			// if cache data is older than timeout, get from URL, else read cache.
 			var timeNow = new Date();
-			var age = timeNow.getMilliseconds() - modifiedTime.getMilliseconds();
+			var age = timeNow.getTime() - modifiedTime.getTime();
 			console.log("Cache file was last updated at " + modifiedTime);
 			
 			if (age > maxCacheTime) {
