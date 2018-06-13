@@ -60,6 +60,7 @@ exports.getCachedData = function(onCalendarDataLoaded) {
 			// if cache data is older than timeout, get from URL, else read cache.
 			var timeNow = new Date();
 			var age = timeNow.getMilliseconds() - modifiedTime.getMilliseconds();
+			console.log("Cache file was last updated at " + modifiedTime);
 			
 			if (age > maxCacheTime) {
 				console.log("Data on disk is older than max age, retriving fresh from URL.");
@@ -67,6 +68,7 @@ exports.getCachedData = function(onCalendarDataLoaded) {
 					readFilesystemCalendar(onCalendarDataLoaded);
 				}).pipe(fs.createWriteStream(calendarCachedFile));
 			} else {
+				console.log("Data on disk is " + age + "ms old. Has not reached cache age of " + cacheHours + " hours.");
 				readFilesystemCalendar(onCalendarDataLoaded);
 			}
 		}
