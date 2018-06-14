@@ -18,6 +18,8 @@ const SHOW_SCORES = "4";
 const PARAM_SCORES_SHOW = 'SHOW';
 const PARAM_FORMAT_DETAILED = 'DETAILED';
 
+var cacheImmediatelyAfter = -1;
+
 var exports = module.exports = {};
 
 if (!Array.prototype.indexOf) {
@@ -48,6 +50,14 @@ function readFilesystemCalendar(onCalendarDataLoaded) {
 	});
 }
 
+function isCurrentTimeAfterUTCTime(timestamp) {
+	var timeNow = new Date();
+	var timeNowUTC = new Date(timeNow.toUTCString());
+	var epochNow = timeNowUTC.getTime();
+
+	return timestamp > 0 && epochNow > timestamp;
+}
+
 exports.getCachedData = function(onCalendarDataLoaded) {
 	if (calendarData == null) {
 		if (!fs.existsSync(calendarCachedFile)) {
@@ -64,8 +74,15 @@ exports.getCachedData = function(onCalendarDataLoaded) {
 			var age = timeNow.getTime() - modifiedTime.getTime();
 			console.log("Cache file was last updated at " + modifiedTime);
 			
-			if (age > maxCacheTime) {
-				console.log("Data on disk is older than max age, retriving fresh from URL.");
+			var cacheExpired = age > maxCacheTime; 
+			var matchScheduledAsEnded = isCurrentTimeAfterUTCTime(cacheImmediatelyAfter);
+			
+			if (cacheExpired || matchScheduledAsEnded) {
+				if (cacheExpired) {
+					console.log("Data on disk is older than max age, retriving fresh from URL.");
+				} else if (matchScheduledAsEnded) {
+					console.log("A match should have recently ended, so retriving fresh from URL.");
+				}
 				request(calendarUrl, function (error, calXhrResponse, body) {
 					readFilesystemCalendar(onCalendarDataLoaded);
 				}).pipe(fs.createWriteStream(calendarCachedFile));
@@ -80,10 +97,39 @@ exports.getCachedData = function(onCalendarDataLoaded) {
 	}
 };
 
+function dueForFinish(match) {
+	var timeNow = new Date();
+	var timeNowUTC = new Date(timeNow.toUTCString());
+	var epochNow = timeNowUTC.getTime();
+	if (strcasecmp(match.state, "PENDING") && epochNow > parseInt(match.endDateTS)) {
+		return true;
+	}
+	return false;
+}
+
+function getEarliestMatchTime(matches) {
+	var earliest = -1;
+	for (var i = 0;i < matches.length;i++) {
+		if (earliest < 0 || matches[i].endDateTS < earliest) {
+			earliest = matches[i].endDateTS;
+		}
+	}
+	return earliest;
+}
+
 function parseStageInto(stage, ical, options) {
 	var matches = stage.matches;
+	var dueForCompletionMatches = [];
 	for (var i = 0;i < matches.length;i++) {
-		parseMatchesInto(stage.name, matches[i], ical, options);
+		var currentMatch = matches[i];
+		parseMatchesInto(stage.name, currentMatch, ical, options);
+		if (dueForFinish(currentMatch)) {
+			matches.push(currentMatch);
+		}
+	}
+	if (dueForCompletionMatches.length > 0) {
+		var earliestMatchTime = getEarliestMatchTime(dueForCompletionMatches);
+		cacheImmediatelyAfter = earliestMatchTime;
 	}
 }
 

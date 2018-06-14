@@ -157,3 +157,51 @@ exports.testSummaryInShortformWithScores = function(test) {
 	test.equals(summary, "OWL BOS [3] d FLA [1]", "Should show BOS d FLA 3-1");
 	test.done();
 };
+
+exports.testOverdueCompleteMatch = function(test) {
+	var timeNow = new Date();
+	var timeNowUTC = new Date(timeNow.toUTCString());
+	var epochNow = timeNowUTC.getTime();
+	
+	var match = {
+		state: "PENDING",
+		endDateTS: epochNow - 3600000
+	};
+	
+	var due = owlsb.dueForFinish(match);
+	test.expect(1);
+	test.ok(due, "Should be marked as overdue for being finished.");
+	test.done();
+}
+
+exports.testIncompleteMatch = function(test) {
+	var timeNow = new Date();
+	var timeNowUTC = new Date(timeNow.toUTCString());
+	var epochNow = timeNowUTC.getTime();
+	
+	var match = {
+			state: "PENDING",
+			endDateTS: epochNow + 3600000
+	};
+	
+	var due = owlsb.dueForFinish(match);
+	test.expect(1);
+	test.ok(!due, "Should not be marked as overdue for being finished.");
+	test.done();
+}
+
+exports.testEarliestMatch = function(test) {
+	var matches = [
+		{ endDateTS: 5000 },
+		{ endDateTS: 4500 },
+		{ endDateTS: 5500 },
+		{ endDateTS: 6000 },
+		{ endDateTS: 5800 }
+	];
+	
+	var earliest = owlsb.getEarliestMatchTime(matches);
+	
+	test.expect(1);
+	test.ok(earliest == 4500, "Earliest value should be 4500, was " + earliest);
+	test.done();
+}
