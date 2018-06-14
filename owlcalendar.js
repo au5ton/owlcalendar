@@ -101,7 +101,7 @@ function getAbbreviatedName(competitor) {
 
 function getMatchSummaryString(options, stageName, match, compet1, compet2) {
 	var score1 = "", score2 = "";
-	var vs = options.format == FORMAT_DETAILED ? " vs " : " v ";
+	var vs = options.showDetailedSummary() ? " vs " : " v ";
 	if (options.showScores() && strcasecmp(match.state, "CONCLUDED")) {
 		if (strcasecmp(match.winner.abbreviatedName, compet2.abbreviatedName)) {
 			var compTmp = compet2;
@@ -117,7 +117,7 @@ function getMatchSummaryString(options, stageName, match, compet1, compet2) {
 	}
 
 	var summary;
-	if (options.format == FORMAT_DETAILED) {
+	if (options.showDetailedSummary()) {
 		summary = stageName;
 		if (match.tournament.type == 'PLAYOFFS') {
 			summary += ' Playoffs';
@@ -274,25 +274,33 @@ function ensureDataLoaded(callback) {
 	exports.getCachedData(callback);
 }
 
-function getOptions(request) {
-	var pars = params(request);
+function createOptionsFromPars(pars) {
 	var teams = getFilteredTeams(pars);
-
 	var options = {
 		format: pars.format != null && !strcasecmp(pars.format, PARAM_FORMAT_DETAILED) ? FORMAT_REGULAR: FORMAT_DETAILED,
 		scores: pars.scores != null && (strcasecmp(pars.scores, PARAM_SCORES_SHOW) || strcasecmp(pars.scores, "true")) ? SHOW_SCORES : 0,
 		teams: teams,
 		
+		showDetailedSummary: function() {
+			return this.format == FORMAT_DETAILED;
+		},
 		showAllTeams: function() {
 			if (this.teams == null || this.teams.length <= 0) {
 				return true;
 			}
-			return true;
+			return false;
 		},
 		showScores: function() {
 			return this.scores == SHOW_SCORES;
 		}
-	}
+	};
+	return options;
+}
+
+function getOptions(request) {
+	var pars = params(request);
+	var options = createOptionsFromPars(pars);
+
 	return options;
 }
 
