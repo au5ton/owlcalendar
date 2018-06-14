@@ -33,7 +33,9 @@ function onRequest(request, response) {
 
 const server = http.createServer(onRequest);
 
-server.listen(port, hostname, () => {
-	console.log(`Server running at http://${hostname}:${port}/`);
+owl.getCachedData(function() {
+	server.listen(port, hostname, () => {
+		console.log(`Server running at http://${hostname}:${port}/`);
+	});
 });
 

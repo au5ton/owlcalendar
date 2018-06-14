@@ -18,6 +18,8 @@ const SHOW_SCORES = "4";
 const PARAM_SCORES_SHOW = 'SHOW';
 const PARAM_FORMAT_DETAILED = 'DETAILED';
 
+var exports = module.exports = {};
+
 if (!Array.prototype.indexOf) {
 	Array.prototype.indexOf = function (obj, fromIndex) {
 		if (fromIndex == null) {
@@ -312,5 +314,5 @@ exports.serveOwlIcal = function(request, response) {
 	});
 };
 
-ensureDataLoaded(function() {});
+//ensureDataLoaded(function() {});
 console.log("OWLCalendar module loaded.");
