@@ -18,6 +18,7 @@ const FORMAT_DETAILED = "2";
 const SHOW_SCORES = "4";
 const PARAM_SCORES_SHOW = 'SHOW';
 const PARAM_FORMAT_DETAILED = 'DETAILED';
+const ALLOWED_RESOURCES = [ '/favicon.ico', '/index.html' ];
 
 var calendarData;
 var cacheImmediatelyAfter = -1;
@@ -398,22 +399,49 @@ var params=function (req) {
   return result;
 }
 
-exports.serveIndex = function(clientIp, request, response) {
-	var requestTime = new Date();
+function allowedResource(url) {
+	console.log(ALLOWED_RESOURCES.length);
+	for (var i = 0;i < ALLOWED_RESOURCES.length;i++) {
+		console.log(ALLOWED_RESOURCES[i]);
+		if (strcasecmp(ALLOWED_RESOURCES[i], url)) {
+			return true;
+		}
+	}
+	return false;
+}
+
+function logRequest(clientIp, url, responseCode) {
+	console.log(clientIp + " " + url + " " + responseCode);
+}
+
+exports.serveRequest = function (clientIp, request, response) {
 	var path = url.parse(request.url).pathname;
-	if (!strcasecmp(path, "/")) {
+	if (request.url.startsWith('/calendar')) {
+		try {
+			exports.serveOwlIcal(request, response);
+		} catch (exception) {
+			console.log("Exception while serving calendar: " + exception.stack);
+			response.end();
+		}
+	} else if (allowedResource(request.url) && fs.existsSync('.' + request.url)) {
+		fs.readFile('.' + request.url, function(err, data) {
+			response.end(data);
+		});
+		logRequest(clientIp, request.url, 200);
+	} else if (!strcasecmp(path, "/")) {
 		if (!response) {
 			console.log("No response object.");
 		} else {
 			response.writeHead(404, 'Not found');
 			response.end('Not found');
-			console.log(requestTime.toString() + " " + clientIp +  " " + request.url + " 404");
+			logRequest(clientIp, request.url, 404);
 		}
 	} else {
 		fs.readFile('./index.html', function(err, data) {
+			response.writeHead(200, 'OK');
 			response.end(data);
 		});
-		console.log(requestTime.toString() + " " + clientIp +  " " + request.url + " Serving index page.");
+		logRequest(clientIp, request.url, 200);
 	}
 }; 
 
