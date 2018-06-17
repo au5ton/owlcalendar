@@ -2,7 +2,6 @@
 
 var fs = require('fs');
 var icalgen = require('ical-generator');
-var calendarData;
 var request = require('request');
 var getIP = require('ipware')().get_ip;
 var url = require('url');
@@ -18,6 +17,7 @@ const SHOW_SCORES = "4";
 const PARAM_SCORES_SHOW = 'SHOW';
 const PARAM_FORMAT_DETAILED = 'DETAILED';
 
+var calendarData;
 var cacheImmediatelyAfter = -1;
 
 var exports = module.exports = {};
@@ -37,15 +37,72 @@ if (!Array.prototype.indexOf) {
 	};
 }
 
-function readFilesystemCalendar(onCalendarDataLoaded) {
-	fs.readFile(calendarCachedFile, 'utf8', function (err, data) {
+function readFromUrlAndWriteToCache(onCalendarDataLoaded, urlToRead, writeTo) {
+	console.log("Reading remote calendar file from " + urlToRead);
+	request(urlToRead, function (error, calXhrResponse, body) {
+		calendarData = JSON.parse(body);
+		onCalendarDataLoaded(calendarData);
+	}).pipe(fs.createWriteStream(writeTo));
+}
+
+function getFileExpiry(cachedFile) {
+	var stats = fs.statSync(cachedFile);
+	var modifiedTime = new Date(stats.mtime);
+	var expiryTime = maxCacheTime + modifiedTime.getTime();
+	var expiryDate = new Date(0);
+	expiryDate.setMilliseconds(expiryTime);
+	return expiryDate;
+}
+
+function getNextMatchCompletion(calData) {
+	var nonConcludedMatches = [];
+	var stages = calData.data.stages;
+	
+	for (var i = 0;i < stages.length;i++) {
+		var stage = stages[i];
+		var matches = stage.matches;
+		for (var j = 0;j < matches.length;j++) {
+			var match = matches[j];
+			if (!strcasecmp("CONCLUDED", match.state)) {
+				nonConcludedMatches.push(match);
+			}
+		}
+	}
+
+	var earliestMatch = getEarliestMatchTime(nonConcludedMatches);
+	return earliestMatch;
+}
+
+function getNextCacheTime(targetFile, data) {
+	var fileExpiryLocal = getFileExpiry(targetFile);
+	var fileExpiryUTCEpoch = fileExpiryLocal.getTime(); 
+	var nextMatchCompetionUTCEpoch = getNextMatchCompletion(data);
+	if (fileExpiryUTCEpoch < nextMatchCompetionUTCEpoch) {
+		console.log("Cache file " + targetFile + " expires at " + fileExpiry);
+		return fileExpiry;
+	} else {
+		var utcMatchTime = new Date(0);
+		utcMatchTime.setTime(nextMatchCompetionUTCEpoch);
+		console.log("Next match is scheduled to end before cache expiry at " + utcMatchTime);
+		return utcMatchTime;
+	}
+}
+
+function readFilesystemCalendar(onCalendarDataLoaded, onCacheDataInvalid, sourceUrl, targetOnFilesystem) {
+	fs.readFile(targetOnFilesystem, 'utf8', function (err, data) {
 		if (err) {
-			return console.log("Error retrieving " + calendarCachedFile + ": " + err);
+			return console.log("Error retrieving " + targetOnFilesystem + ": " + err);
 		} else {
-			console.log("Calendar data retrieved from " + calendarCachedFile);
-			calendarData = JSON.parse(data);
-			//console.debug("Calling function " + onCalendarDataLoaded); 
-			onCalendarDataLoaded(calendarData);
+			if (strcasecmp(data, "") || !data) {
+				console.log("Data on disk was invalid, retrieving from " + sourceUrl);
+				onCacheDataInvalid(onCalendarDataLoaded, sourceUrl, targetOnFilesystem);
+			} else {
+				console.log("Calendar data retrieved from " + targetOnFilesystem);
+				calendarData = JSON.parse(data);
+				//console.debug("Calling function " + onCalendarDataLoaded);
+				cacheImmediatelyAfter = getNextCacheTime(targetOnFilesystem, calendarData);
+				onCalendarDataLoaded(calendarData);
+			}
 		}
 	});
 }
@@ -58,43 +115,98 @@ function isCurrentTimeAfterUTCTime(timestamp) {
 	return timestamp > 0 && epochNow > timestamp;
 }
 
-exports.getCachedData = function(onCalendarDataLoaded) {
-	if (calendarData == null) {
-		if (!fs.existsSync(calendarCachedFile)) {
-			console.log("Reading remote calendar file from " + calendarUrl);
-			request(calendarUrl, function (error, calXhrResponse, body) {
-				readFilesystemCalendar(onCalendarDataLoaded);
-			}).pipe(fs.createWriteStream(calendarCachedFile));
-		} else {
-			//console.debug("File " + calendarCachedFile + " already exists, reading immediately from disk.");
-			var stats = fs.statSync(calendarCachedFile);
-			var modifiedTime = new Date(stats.mtime);
-			// if cache data is older than timeout, get from URL, else read cache.
-			var timeNow = new Date();
-			var age = timeNow.getTime() - modifiedTime.getTime();
-			console.log("Cache file was last updated at " + modifiedTime);
-			
-			var cacheExpired = age > maxCacheTime; 
-			var matchScheduledAsEnded = isCurrentTimeAfterUTCTime(cacheImmediatelyAfter);
-			
-			if (cacheExpired || matchScheduledAsEnded) {
-				if (cacheExpired) {
-					console.log("Data on disk is older than max age, retriving fresh from URL.");
-				} else if (matchScheduledAsEnded) {
-					console.log("A match should have recently ended, so retriving fresh from URL.");
-				}
-				request(calendarUrl, function (error, calXhrResponse, body) {
-					readFilesystemCalendar(onCalendarDataLoaded);
-				}).pipe(fs.createWriteStream(calendarCachedFile));
-			} else {
-				console.log("Data on disk is " + age + "ms old. Has not reached cache age of " + cacheHours + " hours.");
-				readFilesystemCalendar(onCalendarDataLoaded);
-			}
-		}
-	} else {
-		//console.log("Calendar data already loaded.");
-		onCalendarDataLoaded();
+exports.getDataFromFilesystem = function(onDataReadComplete) {
+};
+
+function cachedFileExpired(cachedFile) {
+	var timeNow = new Date();
+	if (timeNow.getTime() > cacheImmediatelyAfter && cacheImmediatelyAfter > 0) {
+		var cachedRequestedAt = new Date(0);
+		cachedRequestedAt.setTime(cacheImmediatelyAfter);
+		console.log("Cache after time was set to require update at " + cachedRequestedAt);
+		return true;
 	}
+	
+	var stats = fs.statSync(cachedFile);
+	var modifiedTime = new Date(stats.mtime);
+	// if cache data is older than timeout, get from URL, else read cache.
+	var age = timeNow.getTime() - modifiedTime.getTime();
+	console.log("Cache file was last updated at " + modifiedTime);
+	
+	var cacheExpired = age > maxCacheTime;
+	return cacheExpired;
+}
+
+exports.checkDataCached = function(onDataCached, onDataNotCached, urlToRetrieve, fileOnDisk) {
+	if (calendarData == null) {
+		if (fs.existsSync(fileOnDisk)) {
+			if (cachedFileExpired(fileOnDisk)) {
+				console.debug("Calling not-cached method " + onDataNotCached + " with params " + urlToRetrieve + ", " + fileOnDisk);
+				onDataNotCached(onDataCached, urlToRetrieve, fileOnDisk);
+				return;
+			} else {
+				// Get next cache update time
+				var checkNextCacheTimeThenProceed = function() {
+					var nextCacheDate = getNextCacheTime(fileOnDisk, calendarData);
+					cacheImmediatelyAfter = nextCacheDate.getTime();
+					onDataCached();
+				}
+				readFilesystemCalendar(checkNextCacheTimeThenProceed, onDataNotCached, urlToRetrieve, fileOnDisk);
+				return;
+			}
+		} else {
+			onDataNotCached(onDataCached, urlToRetrieve, fileOnDisk);
+			return;
+		}
+	}
+	else {
+		onDataCached();
+		return;
+	}
+	console.debug("No path followed, calling not-cached method " + onDataNotCached + " with params " + urlToRetrieve + ", " + fileOnDisk);
+	onDataNotCached(onDataCached, urlToRetrieve, fileOnDisk);
+};
+
+exports.getCachedData = function(onCalendarDataLoaded) {
+	console.debug("Checking cached data.");
+	exports.checkDataCached(onCalendarDataLoaded, readFromUrlAndWriteToCache, calendarUrl, calendarCachedFile);
+	
+//	if (calendarData == null) {
+//		if (!fs.existsSync(calendarCachedFile)) {
+//			console.log("Reading remote calendar file from " + calendarUrl);
+//			request(calendarUrl, function (error, calXhrResponse, body) {
+//				readFilesystemCalendar(onCalendarDataLoaded);
+//			}).pipe(fs.createWriteStream(calendarCachedFile));
+//		} else {
+//			//console.debug("File " + calendarCachedFile + " already exists, reading immediately from disk.");
+//			var stats = fs.statSync(calendarCachedFile);
+//			var modifiedTime = new Date(stats.mtime);
+//			// if cache data is older than timeout, get from URL, else read cache.
+//			var timeNow = new Date();
+//			var age = timeNow.getTime() - modifiedTime.getTime();
+//			console.log("Cache file was last updated at " + modifiedTime);
+//			
+//			var cacheExpired = age > maxCacheTime; 
+//			var matchScheduledAsEnded = isCurrentTimeAfterUTCTime(cacheImmediatelyAfter);
+//			
+//			if (cacheExpired || matchScheduledAsEnded) {
+//				if (cacheExpired) {
+//					console.log("Data on disk is older than max age, retriving fresh from URL.");
+//				} else if (matchScheduledAsEnded) {
+//					console.log("A match should have recently ended, so retriving fresh from URL.");
+//				}
+//				request(calendarUrl, function (error, calXhrResponse, body) {
+//					readFilesystemCalendar(onCalendarDataLoaded);
+//				}).pipe(fs.createWriteStream(calendarCachedFile));
+//			} else {
+//				console.log("Data on disk is " + age + "ms old. Has not reached cache age of " + cacheHours + " hours.");
+//				readFilesystemCalendar(onCalendarDataLoaded);
+//			}
+//		}
+//	} else {
+//		//console.log("Calendar data already loaded.");
+//		onCalendarDataLoaded();
+//	}
 };
 
 function dueForFinish(match) {
@@ -366,6 +478,10 @@ exports.serveOwlIcal = function(request, response) {
 		var ical = buildCalendar(options);
 		ical.serve(response);
 	});
+};
+
+exports.init = function(onComplete) {
+	exports.getCachedData(onComplete);
 };
 
 //ensureDataLoaded(function() {});
