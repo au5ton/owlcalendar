@@ -11,6 +11,7 @@ const maxCacheTime = cacheHours * 60 * 60 * 1000;
 const calendarCachedFile = 'calendar.json';
 const calendarUrl = 'https://api.overwatchleague.com/schedule?expand=team.content&locale=en_US';
 const calendarDomain = 'owl.tjsr.id.au';
+const calendarName = 'Overwatch League ICS Calendar.';
 
 const FORMAT_REGULAR = "1";
 const FORMAT_DETAILED = "2";
@@ -339,7 +340,8 @@ function getTtl() {
 function buildCalendar(options) {
 	var ttl = getTtl();
 	var ical = icalgen().ttl(ttl);
-	ical.domain("owlcalendar");
+	ical.domain(calendarDomain);
+	ical.name(calendarName);
 
 	var stages = calendarData.data.stages;
 	for (var i = 0;i < stages.length;i++) {
