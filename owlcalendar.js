@@ -80,8 +80,8 @@ function getNextCacheTime(targetFile, data) {
 	var fileExpiryUTCEpoch = fileExpiryLocal.getTime(); 
 	var nextMatchCompetionUTCEpoch = getNextMatchCompletion(data);
 	if (fileExpiryUTCEpoch < nextMatchCompetionUTCEpoch) {
-		console.log("Cache file " + targetFile + " expires at " + fileExpiry);
-		return fileExpiry;
+		console.log("Cache file " + targetFile + " expires at " + fileExpiryLocal);
+		return fileExpiryLocal;
 	} else {
 		var utcMatchTime = new Date(0);
 		utcMatchTime.setTime(nextMatchCompetionUTCEpoch);
@@ -102,8 +102,14 @@ function readFilesystemCalendar(onCalendarDataLoaded, onCacheDataInvalid, source
 				console.log("Calendar data retrieved from " + targetOnFilesystem);
 				calendarData = JSON.parse(data);
 				//console.debug("Calling function " + onCalendarDataLoaded);
+				var timeNow = new Date().getTime();
 				cacheImmediatelyAfter = getNextCacheTime(targetOnFilesystem, calendarData);
-				onCalendarDataLoaded(calendarData);
+				if (timeNow > cacheImmediatelyAfter) {
+					readFromUrlAndWriteToCache(onCalendarDataLoaded, sourceUrl, targetOnFilesystem);
+				}
+				else {
+					onCalendarDataLoaded(calendarData);
+				}
 			}
 		}
 	});
