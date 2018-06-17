@@ -10,6 +10,7 @@ const cacheHours = 12;
 const maxCacheTime = cacheHours * 60 * 60 * 1000;
 const calendarCachedFile = 'calendar.json';
 const calendarUrl = 'https://api.overwatchleague.com/schedule?expand=team.content&locale=en_US';
+const calendarDomain = 'owl.tjsr.id.au';
 
 const FORMAT_REGULAR = "1";
 const FORMAT_DETAILED = "2";
@@ -168,45 +169,7 @@ exports.checkDataCached = function(onDataCached, onDataNotCached, urlToRetrieve,
 };
 
 exports.getCachedData = function(onCalendarDataLoaded) {
-	console.debug("Checking cached data.");
 	exports.checkDataCached(onCalendarDataLoaded, readFromUrlAndWriteToCache, calendarUrl, calendarCachedFile);
-	
-//	if (calendarData == null) {
-//		if (!fs.existsSync(calendarCachedFile)) {
-//			console.log("Reading remote calendar file from " + calendarUrl);
-//			request(calendarUrl, function (error, calXhrResponse, body) {
-//				readFilesystemCalendar(onCalendarDataLoaded);
-//			}).pipe(fs.createWriteStream(calendarCachedFile));
-//		} else {
-//			//console.debug("File " + calendarCachedFile + " already exists, reading immediately from disk.");
-//			var stats = fs.statSync(calendarCachedFile);
-//			var modifiedTime = new Date(stats.mtime);
-//			// if cache data is older than timeout, get from URL, else read cache.
-//			var timeNow = new Date();
-//			var age = timeNow.getTime() - modifiedTime.getTime();
-//			console.log("Cache file was last updated at " + modifiedTime);
-//			
-//			var cacheExpired = age > maxCacheTime; 
-//			var matchScheduledAsEnded = isCurrentTimeAfterUTCTime(cacheImmediatelyAfter);
-//			
-//			if (cacheExpired || matchScheduledAsEnded) {
-//				if (cacheExpired) {
-//					console.log("Data on disk is older than max age, retriving fresh from URL.");
-//				} else if (matchScheduledAsEnded) {
-//					console.log("A match should have recently ended, so retriving fresh from URL.");
-//				}
-//				request(calendarUrl, function (error, calXhrResponse, body) {
-//					readFilesystemCalendar(onCalendarDataLoaded);
-//				}).pipe(fs.createWriteStream(calendarCachedFile));
-//			} else {
-//				console.log("Data on disk is " + age + "ms old. Has not reached cache age of " + cacheHours + " hours.");
-//				readFilesystemCalendar(onCalendarDataLoaded);
-//			}
-//		}
-//	} else {
-//		//console.log("Calendar data already loaded.");
-//		onCalendarDataLoaded();
-//	}
 };
 
 function dueForFinish(match) {
@@ -363,8 +326,19 @@ exports.getCalendar = function(calData, response, teams) {
 	ical.serve(response);
 };
 
+function getTtl() {
+	var currentTime = new Date().getTime();
+	if (cacheImmediatelyAfter <= 0) {
+		return cacheHours * 60 * 60;
+	} else {
+		var nextUpdateIn = Math.round((cacheImmediatelyAfter - currentTime) / 1000);
+		return nextUpdateIn;
+	}
+}
+
 function buildCalendar(options) {
-	var ical = icalgen().ttl(60*60*24);
+	var ttl = getTtl();
+	var ical = icalgen().ttl(ttl);
 	ical.domain("owlcalendar");
 
 	var stages = calendarData.data.stages;
