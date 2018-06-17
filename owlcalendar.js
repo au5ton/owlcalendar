@@ -256,7 +256,27 @@ function getMatchSummaryString(options, stageName, match, compet1, compet2) {
 	return summary;
 }
 
-function getMatchDescriptionString(stageName, match,compet1, compet2) {
+function getScoreLine(match, scoreIndex) {
+	if (match.scores.length == 0) {
+		return "";
+	}
+	var games = match.games;
+	var scoreLine = "";
+	for (var i = 0;i < games.length;i++) {
+		var game = games[i];
+		if (game.points && game.points.length > scoreIndex-1) {
+			try {
+				scoreLine += game.points[scoreIndex] + " ";
+			} catch (exception) {
+				console.debug("In match " + match.competitors[0].name + " v " + match.competitors[1].name + " on " + match.startDate);
+			}
+		}
+	}
+	scoreLine += "[" + match.scores[scoreIndex].value + "]";
+	return scoreLine;
+}
+
+function getMatchDescriptionString(options, stageName, match, compet1, compet2) {
 	var description = stageName;
 	if (match.tournament.type == 'PLAYOFFS') {
 		description += ' Playoffs';
@@ -264,6 +284,14 @@ function getMatchDescriptionString(stageName, match,compet1, compet2) {
 	var comp1 = compet1 == null ? "TBA" : compet1.name;
 	var comp2 = compet2 == null ? "TBA" : compet2.name;
 	description += " - " + comp1 + " vs " + comp2;
+	
+	if (options.showScores() && strcasecmp("CONCLUDED", match.status)) {
+		var scoreLine1 = getScoreLine(match, 0);
+		var scoreLine2 = getScoreLine(match, 1);
+		description += "\n";
+		description += compet1.name + ": " + scoreLine1 + "\n";
+		description += compet2.name + ": " + scoreLine2 + "\n";
+	}
 	return description;
 }
 
@@ -302,7 +330,7 @@ function parseMatchesInto(stageName, match, ical, options) {
 		
 		if (showMatch) {
 			var summary = getMatchSummaryString(options, stageName, match, competitors[0], competitors[1]);
-			var description = getMatchDescriptionString(stageName, match, competitors[0], competitors[1]);
+			var description = getMatchDescriptionString(options, stageName, match, competitors[0], competitors[1]);
 			
 			var event = ical.createEvent({
 				id: match.id,

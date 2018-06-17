@@ -17,7 +17,8 @@ function onRequest(request, response) {
 		try {
 			serveCalendar(request, response);
 		} catch (exception) {
-			console.log("Exception while serving calendar: " + exception);
+			console.log("Exception while serving calendar: " + exception.stack);
+			response.end();
 		}
 	} else {
 		try {
@@ -26,7 +27,8 @@ function onRequest(request, response) {
 	
 			owl.serveIndex(clientIp, request, response);
 		} catch (exception) {
-			console.log("Exception while serving index: " + exception);
+			console.log("Exception while serving index: " + exception.stack);
+			response.end();
 		}
 	}
 }
