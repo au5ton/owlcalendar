@@ -400,9 +400,7 @@ var params=function (req) {
 }
 
 function allowedResource(url) {
-	console.log(ALLOWED_RESOURCES.length);
 	for (var i = 0;i < ALLOWED_RESOURCES.length;i++) {
-		console.log(ALLOWED_RESOURCES[i]);
 		if (strcasecmp(ALLOWED_RESOURCES[i], url)) {
 			return true;
 		}
