@@ -8,10 +8,11 @@ var url = require('url');
 
 const cacheHours = 12;
 const maxCacheTime = cacheHours * 60 * 60 * 1000;
-const calendarCachedFile = 'calendar.json';
-const calendarUrl = 'https://api.overwatchleague.com/schedule?expand=team.content&locale=en_US';
+//const calendarCachedFile = 'calendar.json';
+//const calendarUrl = 'https://api.overwatchleague.com/schedule?expand=team.content&locale=en_US';
 const calendarDomain = 'owl.tjsr.id.au';
 const calendarName = 'Overwatch League ICS Calendar.';
+const configFile = "config.json";
 
 const FORMAT_REGULAR = "1";
 const FORMAT_DETAILED = "2";
@@ -20,10 +21,23 @@ const PARAM_SCORES_SHOW = 'SHOW';
 const PARAM_FORMAT_DETAILED = 'DETAILED';
 const ALLOWED_RESOURCES = [ '/favicon.ico', '/index.html' ];
 
-var calendarData;
+var calendarData = [];
 var cacheImmediatelyAfter = -1;
 
+var config;
 var exports = module.exports = {};
+
+async function readConfig(fileToRead, onConfigRead, onComplete) {
+	if (!fileToRead) {
+		fileToRead = configFile;
+	}
+	fs.readFile(fileToRead, 'utf8', function (err, data) {
+		config = JSON.parse(data);
+		console.log("Config loaded from " + fileToRead);
+		onConfigRead(onComplete);
+		return config;
+	});
+}
 
 if (!Array.prototype.indexOf) {
 	Array.prototype.indexOf = function (obj, fromIndex) {
@@ -40,11 +54,11 @@ if (!Array.prototype.indexOf) {
 	};
 }
 
-function readFromUrlAndWriteToCache(onCalendarDataLoaded, urlToRead, writeTo) {
+function readFromUrlAndWriteToCache(onCalendarDataLoaded, urlToRead, writeTo, calendarNumber) {
 	console.log("Reading remote calendar file from " + urlToRead);
 	request(urlToRead, function (error, calXhrResponse, body) {
-		calendarData = JSON.parse(body);
-		onCalendarDataLoaded(calendarData);
+		calendarData[calendarNumber] = JSON.parse(body);
+		onCalendarDataLoaded(calendarData[calendarNumber]);
 	}).pipe(fs.createWriteStream(writeTo));
 }
 
@@ -83,33 +97,35 @@ function getNextCacheTime(targetFile, data) {
 	if (fileExpiryUTCEpoch < nextMatchCompetionUTCEpoch) {
 		console.log("Cache file " + targetFile + " expires at " + fileExpiryLocal);
 		return fileExpiryLocal;
-	} else {
+	} else if (nextMatchCompetionUTCEpoch > 0) {
 		var utcMatchTime = new Date(0);
 		utcMatchTime.setTime(nextMatchCompetionUTCEpoch);
 		console.log("Next match is scheduled to end before cache expiry at " + utcMatchTime);
 		return utcMatchTime;
+	} else {
+		return null;
 	}
 }
 
-function readFilesystemCalendar(onCalendarDataLoaded, onCacheDataInvalid, sourceUrl, targetOnFilesystem) {
+function readFilesystemCalendar(onCalendarDataLoaded, onCacheDataInvalid, sourceUrl, targetOnFilesystem, calendarNumber) {
 	fs.readFile(targetOnFilesystem, 'utf8', function (err, data) {
 		if (err) {
 			return console.log("Error retrieving " + targetOnFilesystem + ": " + err);
 		} else {
 			if (strcasecmp(data, "") || !data) {
 				console.log("Data on disk was invalid, retrieving from " + sourceUrl);
-				onCacheDataInvalid(onCalendarDataLoaded, sourceUrl, targetOnFilesystem);
+				onCacheDataInvalid(onCalendarDataLoaded, sourceUrl, targetOnFilesystem, calendarNumber);
 			} else {
 				console.log("Calendar data retrieved from " + targetOnFilesystem);
-				calendarData = JSON.parse(data);
+				calendarData[calendarNumber] = JSON.parse(data);
 				//console.debug("Calling function " + onCalendarDataLoaded);
 				var timeNow = new Date().getTime();
-				cacheImmediatelyAfter = getNextCacheTime(targetOnFilesystem, calendarData);
-				if (timeNow > cacheImmediatelyAfter) {
-					readFromUrlAndWriteToCache(onCalendarDataLoaded, sourceUrl, targetOnFilesystem);
+				cacheImmediatelyAfter = getNextCacheTime(targetOnFilesystem, calendarData[calendarNumber]);
+				if (cacheImmediatelyAfter && timeNow > cacheImmediatelyAfter) {
+					readFromUrlAndWriteToCache(onCalendarDataLoaded, sourceUrl, targetOnFilesystem, calendarNumber);
 				}
 				else {
-					onCalendarDataLoaded(calendarData);
+					onCalendarDataLoaded(calendarData, calendarNumber);
 				}
 			}
 		}
@@ -140,44 +156,51 @@ function cachedFileExpired(cachedFile) {
 	var modifiedTime = new Date(stats.mtime);
 	// if cache data is older than timeout, get from URL, else read cache.
 	var age = timeNow.getTime() - modifiedTime.getTime();
-	console.log("Cache file was last updated at " + modifiedTime);
+	console.log("Cache file " + cachedFile + " was last updated at " + modifiedTime);
 	
 	var cacheExpired = age > maxCacheTime;
 	return cacheExpired;
 }
 
-exports.checkDataCached = function(onDataCached, onDataNotCached, urlToRetrieve, fileOnDisk) {
-	if (calendarData == null) {
+exports.checkDataCached = async function(onDataNotCached, urlToRetrieve, fileOnDisk, calendarNumber) {
+	if (calendarData.length < calendarNumber || !calendarData[calendarNumber]) {
 		if (fs.existsSync(fileOnDisk)) {
 			if (cachedFileExpired(fileOnDisk)) {
 				console.debug("Calling not-cached method " + onDataNotCached + " with params " + urlToRetrieve + ", " + fileOnDisk);
-				onDataNotCached(onDataCached, urlToRetrieve, fileOnDisk);
+				onDataNotCached(urlToRetrieve, fileOnDisk, calendarNumber);
 				return;
 			} else {
 				// Get next cache update time
 				var checkNextCacheTimeThenProceed = function() {
-					var nextCacheDate = getNextCacheTime(fileOnDisk, calendarData);
-					cacheImmediatelyAfter = nextCacheDate.getTime();
-					onDataCached();
+					var nextCacheDate = getNextCacheTime(fileOnDisk, calendarData[calendarNumber]);
+					if (nextCacheDate) {
+						cacheImmediatelyAfter = nextCacheDate.getTime();
+					}
+					return;
 				}
-				readFilesystemCalendar(checkNextCacheTimeThenProceed, onDataNotCached, urlToRetrieve, fileOnDisk);
+				readFilesystemCalendar(checkNextCacheTimeThenProceed, onDataNotCached, urlToRetrieve, fileOnDisk, calendarNumber);
 				return;
 			}
 		} else {
-			onDataNotCached(onDataCached, urlToRetrieve, fileOnDisk);
+			onDataNotCached(urlToRetrieve, fileOnDisk, calendarNumber);
 			return;
 		}
 	}
 	else {
-		onDataCached();
 		return;
 	}
 	console.debug("No path followed, calling not-cached method " + onDataNotCached + " with params " + urlToRetrieve + ", " + fileOnDisk);
-	onDataNotCached(onDataCached, urlToRetrieve, fileOnDisk);
+	onDataNotCached(urlToRetrieve, fileOnDisk);
 };
 
-exports.getCachedData = function(onCalendarDataLoaded) {
-	exports.checkDataCached(onCalendarDataLoaded, readFromUrlAndWriteToCache, calendarUrl, calendarCachedFile);
+exports.getCachedData = async function() {
+	for (var i = 0;i < config.calendars.length;i++) {
+		var calendar = config.calendars[i];
+		var calendarUrl = calendar.url;
+		var calendarCachedFile = calendar.cache;
+		await exports.checkDataCached(readFromUrlAndWriteToCache, calendarUrl, calendarCachedFile, i);
+	}
+	return;
 };
 
 function dueForFinish(match) {
@@ -352,11 +375,14 @@ function parseMatchesInto(stageName, match, ical, options) {
 	}
 }
 
-exports.getCalendar = function(calData, response, teams) {
-	var stages = calData.data.stages;
-	
-	for (var i = 0;i < stages.length;i++) {
-		parseStageInto(stages[i], ical, teams);
+exports.getCalendar = function(calendars, response, teams) {
+	for (var calNumber = 0;calNumber < calendars.length;calNumber++) {
+		calData = calendars[calNumber];
+		var stages = calData.data.stages;
+		
+		for (var i = 0;i < stages.length;i++) {
+			parseStageInto(stages[i], ical, teams);
+		}
 	}
 
 	ical.serve(response);
@@ -378,9 +404,12 @@ function buildCalendar(options) {
 	ical.domain(calendarDomain);
 	ical.name(calendarName);
 
-	var stages = calendarData.data.stages;
-	for (var i = 0;i < stages.length;i++) {
-		parseStageInto(stages[i], ical, options);
+	for (var cal = 0;cal < calendarData.length;cal++) {
+		var currentCal = calendarData[cal];
+		var stages = currentCal.data.stages;
+		for (var i = 0;i < stages.length;i++) {
+			parseStageInto(stages[i], ical, options);
+		}
 	}
 	return ical;
 }
@@ -516,9 +545,16 @@ exports.serveOwlIcal = function(request, response) {
 	});
 };
 
-exports.init = function(onComplete) {
-	exports.getCachedData(onComplete);
+
+exports.init = async function(onComplete, configToRead) {
+	try {
+		await readConfig(configToRead, exports.getCachedData, onComplete);
+	} catch (e) {
+		console.log("Exception while reading config " + configToRead);
+		console.log(e);
+	}
+	onComplete();
 };
 
 //ensureDataLoaded(function() {});
-console.log("OWLCalendar module loaded.");
+//console.log("OWLCalendar module loaded.");

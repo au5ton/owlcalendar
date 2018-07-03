@@ -1,0 +1,17 @@
+{
+	"cacheHours": "12",
+	"calendarDomain": "calendarDomain",
+	"calendarName": "Overwatch League ICS Calendar.",
+	"calendars": [
+		{
+			"name": "owl",
+			"url": "https://api.overwatchleague.com/schedule?expand=team.content&locale=en_US",
+			"cache": "owlcache.js"
+		},
+		{
+			"name": "contenders",
+			"url": "https://overwatch-contenders-api-prod.playoverwatch.com/schedule?expand=team.content&locale=en_US&season=2018S2",
+			"cache": "contenders.js"
+		}
+	]
+}
