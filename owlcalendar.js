@@ -237,9 +237,11 @@ function parseStageInto(stage, ical, options) {
 	var dueForCompletionMatches = [];
 	for (var i = 0;i < matches.length;i++) {
 		var currentMatch = matches[i];
-		parseMatchesInto(stage.name, currentMatch, ical, options);
-		if (dueForFinish(currentMatch)) {
-			matches.push(currentMatch);
+		if (currentMatch.startDate) {
+			parseMatchesInto(stage.name, currentMatch, ical, options);
+			if (dueForFinish(currentMatch)) {
+				matches.push(currentMatch);
+			}
 		}
 	}
 	if (dueForCompletionMatches.length > 0) {
@@ -354,6 +356,9 @@ function shouldShowMatch(options, competitors) {
 }
 
 function parseMatchesInto(stageName, match, ical, options) {
+	if (!match.startDate) {
+		throw Error("Match does not have a start date, to can't be created as a calendar event.");
+	}
 	var filteredTeams = options.teams;
 	
 	var competitors = match.competitors;
