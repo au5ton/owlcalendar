@@ -54,11 +54,18 @@ if (!Array.prototype.indexOf) {
 	};
 }
 
-function readFromUrlAndWriteToCache(onCalendarDataLoaded, urlToRead, writeTo, calendarNumber) {
+async function readFromUrlAndWriteToCache(urlToRead, writeTo, calendarNumber) {
 	console.log("Reading remote calendar file from " + urlToRead);
 	request(urlToRead, function (error, calXhrResponse, body) {
-		calendarData[calendarNumber] = JSON.parse(body);
-		onCalendarDataLoaded(calendarData[calendarNumber]);
+		if (body) {
+			calendarData[calendarNumber] = JSON.parse(body);
+			console.log("Loaded file from " + urlToRead);
+			return calendarData[calendarNumber];
+			//onCalendarDataLoaded(calendarData[calendarNumber]);
+		} else {
+			console.trace("Failed reading calendar data from " + urlToRead + " Method: " + onCalendarDataLoaded + " WriteTo: " + writeTo);
+			return;
+		}
 	}).pipe(fs.createWriteStream(writeTo));
 }
 
@@ -107,14 +114,17 @@ function getNextCacheTime(targetFile, data) {
 	}
 }
 
-function readFilesystemCalendar(onCalendarDataLoaded, onCacheDataInvalid, sourceUrl, targetOnFilesystem, calendarNumber) {
+async function readFilesystemCalendar(onCalendarDataLoaded, configNode, calendarNumber) {
+	var sourceUrl = configNode.url;
+	var targetOnFilesystem = configNode.cache;
+	
 	fs.readFile(targetOnFilesystem, 'utf8', function (err, data) {
 		if (err) {
 			return console.log("Error retrieving " + targetOnFilesystem + ": " + err);
 		} else {
 			if (strcasecmp(data, "") || !data) {
 				console.log("Data on disk was invalid, retrieving from " + sourceUrl);
-				onCacheDataInvalid(onCalendarDataLoaded, sourceUrl, targetOnFilesystem, calendarNumber);
+				readFromUrlAndWriteToCache(sourceUrl, targetOnFilesystem, calendarNumber);
 			} else {
 				console.log("Calendar data retrieved from " + targetOnFilesystem);
 				calendarData[calendarNumber] = JSON.parse(data);
@@ -122,7 +132,7 @@ function readFilesystemCalendar(onCalendarDataLoaded, onCacheDataInvalid, source
 				var timeNow = new Date().getTime();
 				cacheImmediatelyAfter = getNextCacheTime(targetOnFilesystem, calendarData[calendarNumber]);
 				if (cacheImmediatelyAfter && timeNow > cacheImmediatelyAfter) {
-					readFromUrlAndWriteToCache(onCalendarDataLoaded, sourceUrl, targetOnFilesystem, calendarNumber);
+					readFromUrlAndWriteToCache(sourceUrl, targetOnFilesystem, calendarNumber);
 				}
 				else {
 					onCalendarDataLoaded(calendarData, calendarNumber);
@@ -162,12 +172,13 @@ function cachedFileExpired(cachedFile) {
 	return cacheExpired;
 }
 
-exports.checkDataCached = async function(onDataNotCached, urlToRetrieve, fileOnDisk, calendarNumber) {
+exports.checkDataCached = async function(configNode, calendarNumber) {
+	var urlToRetrieve = configNode.url;
+	var fileOnDisk = configNode.cache;
 	if (calendarData.length < calendarNumber || !calendarData[calendarNumber]) {
 		if (fs.existsSync(fileOnDisk)) {
 			if (cachedFileExpired(fileOnDisk)) {
-				console.debug("Calling not-cached method " + onDataNotCached + " with params " + urlToRetrieve + ", " + fileOnDisk);
-				onDataNotCached(urlToRetrieve, fileOnDisk, calendarNumber);
+				await readFromUrlAndWriteToCache(urlToRetrieve, fileOnDisk, calendarNumber);
 				return;
 			} else {
 				// Get next cache update time
@@ -178,11 +189,12 @@ exports.checkDataCached = async function(onDataNotCached, urlToRetrieve, fileOnD
 					}
 					return;
 				}
-				readFilesystemCalendar(checkNextCacheTimeThenProceed, onDataNotCached, urlToRetrieve, fileOnDisk, calendarNumber);
+				console.log("Reading from filesystem: " + fileOnDisk);
+				readFilesystemCalendar(checkNextCacheTimeThenProceed, configNode, calendarNumber);
 				return;
 			}
 		} else {
-			onDataNotCached(urlToRetrieve, fileOnDisk, calendarNumber);
+			await readFromUrlAndWriteToCache(urlToRetrieve, fileOnDisk, calendarNumber);
 			return;
 		}
 	}
@@ -190,15 +202,12 @@ exports.checkDataCached = async function(onDataNotCached, urlToRetrieve, fileOnD
 		return;
 	}
 	console.debug("No path followed, calling not-cached method " + onDataNotCached + " with params " + urlToRetrieve + ", " + fileOnDisk);
-	onDataNotCached(urlToRetrieve, fileOnDisk);
+	await readFromUrlAndWriteToCache(urlToRetrieve, fileOnDisk, calendarNumber);
 };
 
 exports.getCachedData = async function() {
-	for (var i = 0;i < config.calendars.length;i++) {
-		var calendar = config.calendars[i];
-		var calendarUrl = calendar.url;
-		var calendarCachedFile = calendar.cache;
-		await exports.checkDataCached(readFromUrlAndWriteToCache, calendarUrl, calendarCachedFile, i);
+	for (var nodeNumber = 0;nodeNumber < config.calendars.length;nodeNumber++) {
+		await exports.checkDataCached(config.calendars[nodeNumber], nodeNumber);
 	}
 	return;
 };
@@ -245,7 +254,7 @@ function getAbbreviatedName(competitor) {
 		abbr = "TBA";
 	} else if (competitor.abbreviatedName) {
 		abbr = competitor.abbreviatedName;
-	} else if (competitor.content.abbreviatedName) {
+	} else if (competitor.content && competitor.content.abbreviatedName) {
 		abbr = competitor.content.abbreviatedName;
 	}
 	return abbr;
@@ -353,8 +362,8 @@ function parseMatchesInto(stageName, match, ical, options) {
 	} else {
 		var comp1 = competitors[0] == null ? "TBA" : competitors[0].name;
 		var comp2 = competitors[1] == null ? "TBA" : competitors[1].name;
-		var abbr1 = getAbbreviatedName(competitors[0]);
-		var abbr2 = getAbbreviatedName(competitors[1]);
+		//var abbr1 = getAbbreviatedName(competitors[0]);
+		//var abbr2 = getAbbreviatedName(competitors[1]);
 		
 		var showMatch = shouldShowMatch(options, competitors);
 		
@@ -377,7 +386,7 @@ function parseMatchesInto(stageName, match, ical, options) {
 
 exports.getCalendar = function(calendars, response, teams) {
 	for (var calNumber = 0;calNumber < calendars.length;calNumber++) {
-		calData = calendars[calNumber];
+		var calData = calendars[calNumber];
 		var stages = calData.data.stages;
 		
 		for (var i = 0;i < stages.length;i++) {
@@ -403,8 +412,11 @@ function buildCalendar(options) {
 	var ical = icalgen().ttl(ttl);
 	ical.domain(calendarDomain);
 	ical.name(calendarName);
+	
+	console.log(calendarData.length + " calendars loaded.");
 
 	for (var cal = 0;cal < calendarData.length;cal++) {
+		console.log("Adding data from calendar " + cal);
 		var currentCal = calendarData[cal];
 		var stages = currentCal.data.stages;
 		for (var i = 0;i < stages.length;i++) {
@@ -493,8 +505,8 @@ function strcasecmp(string1, string2) {
 	return string1 === string2;
 }
 
-function ensureDataLoaded(callback) {
-	exports.getCachedData(callback);
+async function ensureDataLoaded() {
+	await exports.getCachedData();
 }
 
 function createOptionsFromPars(pars) {
@@ -527,7 +539,7 @@ function getOptions(request) {
 	return options;
 }
 
-exports.serveOwlIcal = function(request, response) {
+exports.serveOwlIcal = async function(request, response) {
 	var ipInfo = getIP(request);
 	var clientIp = ipInfo.clientIp;
 	var requestTime = new Date();
@@ -539,10 +551,10 @@ exports.serveOwlIcal = function(request, response) {
 		console.log(requestTime.toString() + " " + clientIp +  " " + request.url + " Returning only teams " + options.teams);
 	}
 
-	ensureDataLoaded(function() {
-		var ical = buildCalendar(options);
-		ical.serve(response);
-	});
+	await ensureDataLoaded();
+	
+	var ical = buildCalendar(options);
+	ical.serve(response);
 };
 
 
