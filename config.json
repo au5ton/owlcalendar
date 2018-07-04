@@ -9,9 +9,14 @@
 			"cache": "owlcache.js"
 		},
 		{
-			"name": "contenders",
+			"name": "contendersS2",
 			"url": "https://overwatch-contenders-api-prod.playoverwatch.com/schedule?expand=team.content&locale=en_US&season=2018S2",
-			"cache": "contenders.js"
+			"cache": "contenders2.js"
+		},
+		{
+			"name": "contendersS1",
+			"url": "https://overwatch-contenders-api-prod.playoverwatch.com/schedule?expand=team.content&locale=en_US&season=2018S1",
+			"cache": "contenders1.js"
 		}
 	]
 }
