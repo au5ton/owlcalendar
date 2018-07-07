@@ -4,16 +4,18 @@
 	</head>
 	<body>
 		<h1>Overwatch League ICS calendar</h1>
-		<h2>Recent fixes</h2>
+		<h2>Recent fixes and additions</h2>
 		<ul>
+			<li>7/07/2018 - Added functionality to get multiple calendars and contenders calendars.</li>
 			<li>17/06/2018 - The calendar will now referesh its own cache immediately after any future match was scheduled to end to attempt to get the latest data immediately.</li>
 			<li>15/06/2018 - Fixed an issue with the proxy that was always giving people the detfault data feed and where it was ignoring the parameters passed to the script.</li>
 		</ul>
  		<h2>How-to</h2>
-		<p>This tool provides an ics feed for the Overwatch League calendar.  It takes the data feed Blizzard provide from their API and converts it to a format that you can use applications such a Google Calendar to embed a calendar in to.  Parameters can be added to limit or format the data as you want them to be displayed.</p>
+		<p>This tool provides an ics feed for the Overwatch League and contenders calendars.  It takes the data feeds Blizzard provide from their API and converts it to a format that you can use applications such a Google Calendar to embed a calendar in to.  Parameters can be added to limit or format the data as you want them to be displayed.</p>
 		<h2>Example format</h2>
 		<p>To get all calendar data in the basic format, use <a href="/calendar">/calendar</a></p>
-		<h3>Limiting to teams</h3>
+		<p>For the calendar with detailed team names and showing scores/spoilers, use <a href="/calendar?format=detailed&amp;scores=true">/calendar?format=detailed&amp;scores=true</a></p>
+ 		<h3>Limiting to teams</h3>
 		<p>To limit the data to only matches that are contested by one or more teams, add the <strong>teams</strong> parameter, with the three-letter abbreviation separated by a comma.</p>
 		<p>eg, <strong><a href="/calendar?teams=LAV,NYE,BOS">/calendar?teams=LAV,NYE,BOS</a></strong> will give a feed featuring only games in which Los Angeles Valiant, New York Excelsior, and Boston Uprising are participating in, plus all finals in which the competitors are unknown.</p>
 		<p>Valid values are:
@@ -32,6 +34,17 @@
 				<li>PHI/PF - Philadeliphia Fusion</li>
 			</ul>
 		</p>
+		<h3>Limiting to leagues</h3>
+		<p>You can retrieve multiple league calendars in a single ICS feed using the <strong>leagues</strong> parameter.  If omitted, only Overwatch League will be returned.  Valid values are:
+			<ul>
+				<li>OWL - Overwatch League. This acronym will also be the current season.</li>
+				<li>CS2 - Overwatch Contenders - Season 2</li>
+				<li>CS1 - Overwatch Contenders - Season 1</li>
+			</ul>
+		</p>
+		<p>For example, for a feed with detailed info, showing scores, for all Overwatch Contenders Season 1 and 2 matches, use <a href="/calendar?format=detailed&scores=true&leagues=CS1,CS2">/calendar?format=detailed&scores=true&leagues=CS1,CS2</a></p>
+		<p>Say you wanted a calendar with only games featuring the Sydney Drop Bears in Contenders Season 2, you could use <a href="/calendar?scores=true&leagues=CS2&teams=SDB">/calendar?scores=true&leagues=CS2&teams=SDB</a></p>
+		<p>When more data becomes available, functionality will be added for World Cup games.  This league will likely be OWC2018.</p>
 		<h3>Match text format</h3>
 		<p>The default short format is <strong>OWL LAV v SHD</strong>. Adding the value <strong>format=detailed</strong> will show extended detail for the calendar event item, and the output format will become <strong>Stage 4 - Los Angeles Valiant vs Shanghai Dragons</strong></p>
 		<p>eg, <strong><a href="/calendar?teams=SHD,LAV&amp;format=detailed">/calendar?teams=SHD,LAV&amp;format=detailed</a></strong></p>

@@ -4,19 +4,28 @@
 	"calendarName": "Overwatch League ICS Calendar.",
 	"calendars": [
 		{
+			"tag": "OWL",
 			"name": "owl",
+			"displayName": "Overwatch League 2018 Season",
 			"url": "https://api.overwatchleague.com/schedule?expand=team.content&locale=en_US",
-			"cache": "owlcache.js"
+			"cache": "owlcache.js",
+			"default": true
 		},
 		{
+			"tag": "CS2",
 			"name": "contendersS2",
+			"displayName": "Overwatch Contenders - 2018 Season 2",
 			"url": "https://overwatch-contenders-api-prod.playoverwatch.com/schedule?expand=team.content&locale=en_US&season=2018S2",
-			"cache": "contenders2.js"
+			"cache": "contenders2.js",
+			"default": false
 		},
 		{
+			"tag": "CS1",
 			"name": "contendersS1",
+			"displayName": "Overwatch Contenders - 2018 Season 1",
 			"url": "https://overwatch-contenders-api-prod.playoverwatch.com/schedule?expand=team.content&locale=en_US&season=2018S1",
-			"cache": "contenders1.js"
+			"cache": "contenders1.js",
+			"default": false
 		}
 	]
 }

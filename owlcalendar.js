@@ -21,11 +21,58 @@ const PARAM_SCORES_SHOW = 'SHOW';
 const PARAM_FORMAT_DETAILED = 'DETAILED';
 const ALLOWED_RESOURCES = [ '/favicon.ico', '/index.html' ];
 
-var calendarData = [];
+var loadedData = [];
 var cacheImmediatelyAfter = -1;
 
 var config;
 var exports = module.exports = {};
+
+function findLoadedDataIndex(name) {
+	for (var i = 0;i < loadedData.length;i++) {
+		var node = loadedData[i];
+		if (!node.config.name) {
+			console.trace("loadedData array node existed with no name property.");
+		} else if (strcasecmp(node.config.name, name)) {
+			return i;
+		}
+	}
+	return -1;
+}
+
+function findLoadedData(name) {
+	var index = findLoadedDataIndex(name);
+	if (index >= 0) {
+		return loadedData[index];
+	} else {
+		return;
+	}
+}
+
+function isFileLoaded(configNode) {
+	return findLoadedData(configNode.name) != undefined;
+}
+
+
+function addLoadedData(calendarDataObj, timeLoaded, configItem) {
+	var nextCacheTime = getNextCacheTime(configItem.cache, calendarDataObj);
+	if (!nextCacheTime) {
+		console.debug("Could not determine a next time to refresh cache for " + configItem.name);
+	}
+	var data = {
+		calendar: calendarDataObj,
+		timeLoaded: timeLoaded,
+		config: configItem,
+		nextCacheTime: nextCacheTime
+	};
+	
+	var index = findLoadedDataIndex(configItem.name);
+	if (index >= 0) {
+		loadedData[index] = data;// overwrite
+	} else {
+		loadedData.push(data);
+	}
+	return data;
+}
 
 async function readConfig(fileToRead, onConfigRead, onComplete) {
 	if (!fileToRead) {
@@ -54,16 +101,20 @@ if (!Array.prototype.indexOf) {
 	};
 }
 
-async function readFromUrlAndWriteToCache(urlToRead, writeTo, calendarNumber) {
-	console.log("Reading remote calendar file from " + urlToRead);
-	request(urlToRead, function (error, calXhrResponse, body) {
+async function readFromUrlAndWriteToCache(configNode) {
+	var urlToRetrieve = configNode.url;
+	var writeTo = configNode.cache;
+	
+	console.log("Reading remote calendar file from " + urlToRetrieve);
+	request(urlToRetrieve, function (error, calXhrResponse, body) {
 		if (body) {
-			calendarData[calendarNumber] = JSON.parse(body);
-			console.log("Loaded file from " + urlToRead);
-			return calendarData[calendarNumber];
-			//onCalendarDataLoaded(calendarData[calendarNumber]);
+			var calDataObj = JSON.parse(body);
+			var timeNow = new Date();
+			var dataNode = addLoadedData(calDataObj, timeNow, configNode);
+			console.log("Loaded file from " + urlToRetrieve + ". Next refresh is due at " + dataNode.nextCacheTime);
+			return calDataObj;
 		} else {
-			console.trace("Failed reading calendar data from " + urlToRead + " Method: " + onCalendarDataLoaded + " WriteTo: " + writeTo);
+			console.trace("Failed reading calendar data from " + urlToRetrieve + " Method: " + onCalendarDataLoaded + " WriteTo: " + writeTo);
 			return;
 		}
 	}).pipe(fs.createWriteStream(writeTo));
@@ -78,43 +129,60 @@ function getFileExpiry(cachedFile) {
 	return expiryDate;
 }
 
-function getNextMatchCompletion(calData) {
+function getNextMatchCompletion(calendarData) {
 	var nonConcludedMatches = [];
-	var stages = calData.data.stages;
-	
-	for (var i = 0;i < stages.length;i++) {
-		var stage = stages[i];
-		var matches = stage.matches;
-		for (var j = 0;j < matches.length;j++) {
-			var match = matches[j];
-			if (!strcasecmp("CONCLUDED", match.state)) {
-				nonConcludedMatches.push(match);
+	if (!calendarData) {
+		throw Error('Null param passed in to getNextMatchCompletion');
+	} else if (!calendarData.data) {
+		console.trace("Loaded data array does not contain calendar but was " + calendarData);
+	} else {
+		var stages = calendarData.data.stages;
+		
+		for (var i = 0;i < stages.length;i++) {
+			var stage = stages[i];
+			var matches = stage.matches;
+			for (var j = 0;j < matches.length;j++) {
+				var match = matches[j];
+				if (!strcasecmp("CONCLUDED", match.state)) {
+					nonConcludedMatches.push(match);
+				}
 			}
 		}
+	
+		var earliestMatch = getEarliestMatchTime(nonConcludedMatches);
+		return earliestMatch;
 	}
-
-	var earliestMatch = getEarliestMatchTime(nonConcludedMatches);
-	return earliestMatch;
 }
 
-function getNextCacheTime(targetFile, data) {
+function getNextCacheTimeFromConfNode(confNode) {
+	var cacheFile = confNode.cache;
+	var data = findLoadedData(confNode.name);
+	if (!data) {
+		throw Error("Did not find loaded data for name " + confNode.name)
+	} else {
+		data.nextCacheTime = getNextCacheTime(cacheFile, data.calendar);
+	}
+}
+
+function getNextCacheTime(targetFile, calendarData) {
 	var fileExpiryLocal = getFileExpiry(targetFile);
 	var fileExpiryUTCEpoch = fileExpiryLocal.getTime(); 
-	var nextMatchCompetionUTCEpoch = getNextMatchCompletion(data);
-	if (fileExpiryUTCEpoch < nextMatchCompetionUTCEpoch) {
-		console.log("Cache file " + targetFile + " expires at " + fileExpiryLocal);
+	var nextMatchCompetionUTCEpoch = getNextMatchCompletion(calendarData);
+	var utcMatchTime = new Date(0);
+	utcMatchTime.setTime(nextMatchCompetionUTCEpoch);
+	if (fileExpiryUTCEpoch < nextMatchCompetionUTCEpoch || nextMatchCompetionUTCEpoch <= 0) {
+		console.log("File exipres first - cache file " + targetFile + " expires at " + fileExpiryLocal);
 		return fileExpiryLocal;
 	} else if (nextMatchCompetionUTCEpoch > 0) {
-		var utcMatchTime = new Date(0);
-		utcMatchTime.setTime(nextMatchCompetionUTCEpoch);
 		console.log("Next match is scheduled to end before cache expiry at " + utcMatchTime);
 		return utcMatchTime;
 	} else {
-		return null;
+		console.log("There was a problem getting cache expiry for " + targetFile + " with file expiry of " + fileExpiryLocal + " and match completion of " + utcMatchTime);
+		return fileExpiryLocal;
 	}
 }
 
-async function readFilesystemCalendar(onCalendarDataLoaded, configNode, calendarNumber) {
+async function readFilesystemCalendar(configNode) {
 	var sourceUrl = configNode.url;
 	var targetOnFilesystem = configNode.cache;
 	
@@ -124,18 +192,17 @@ async function readFilesystemCalendar(onCalendarDataLoaded, configNode, calendar
 		} else {
 			if (strcasecmp(data, "") || !data) {
 				console.log("Data on disk was invalid, retrieving from " + sourceUrl);
-				readFromUrlAndWriteToCache(sourceUrl, targetOnFilesystem, calendarNumber);
+				readFromUrlAndWriteToCache(configNode);
 			} else {
-				console.log("Calendar data retrieved from " + targetOnFilesystem);
-				calendarData[calendarNumber] = JSON.parse(data);
-				//console.debug("Calling function " + onCalendarDataLoaded);
+				var calData = JSON.parse(data);
 				var timeNow = new Date().getTime();
-				cacheImmediatelyAfter = getNextCacheTime(targetOnFilesystem, calendarData[calendarNumber]);
-				if (cacheImmediatelyAfter && timeNow > cacheImmediatelyAfter) {
-					readFromUrlAndWriteToCache(sourceUrl, targetOnFilesystem, calendarNumber);
+				var nodeItem = addLoadedData(calData, timeNow, configNode);
+				if (nodeItem.nextCacheTime && timeNow > nodeItem.nextCacheTime) {
+					console.log("Calendar data on filesystem at " + targetOnFilesystem + " requires refresh.");
+					readFromUrlAndWriteToCache(configNode);
 				}
 				else {
-					onCalendarDataLoaded(calendarData, calendarNumber);
+					console.log("Calendar data retrieved from filesystem at " + targetOnFilesystem);
 				}
 			}
 		}
@@ -153,12 +220,14 @@ function isCurrentTimeAfterUTCTime(timestamp) {
 exports.getDataFromFilesystem = function(onDataReadComplete) {
 };
 
-function cachedFileExpired(cachedFile) {
+function cachedFileExpired(configItem) {
+	var dataItem = findLoadedData(configItem.name);
+	var cachedFile = configItem.cache;
 	var timeNow = new Date();
-	if (timeNow.getTime() > cacheImmediatelyAfter && cacheImmediatelyAfter > 0) {
+	if (dataItem.nextCacheTime && dataItem.nextCacheTime > 0 && timeNow.getTime() > dataItem.nextCacheTime) {
 		var cachedRequestedAt = new Date(0);
-		cachedRequestedAt.setTime(cacheImmediatelyAfter);
-		console.log("Cache after time was set to require update at " + cachedRequestedAt);
+		cachedRequestedAt.setTime(dataItem.nextCacheTime);
+		console.log("Cache after time on " + cachedFile + " was set to require update at " + cachedRequestedAt);
 		return true;
 	}
 	
@@ -172,42 +241,32 @@ function cachedFileExpired(cachedFile) {
 	return cacheExpired;
 }
 
-exports.checkDataCached = async function(configNode, calendarNumber) {
+exports.checkDataCachedForConfig = async function(configNode) {
+	var data = findLoadedData(configNode.name);
 	var urlToRetrieve = configNode.url;
 	var fileOnDisk = configNode.cache;
-	if (calendarData.length < calendarNumber || !calendarData[calendarNumber]) {
-		if (fs.existsSync(fileOnDisk)) {
-			if (cachedFileExpired(fileOnDisk)) {
-				await readFromUrlAndWriteToCache(urlToRetrieve, fileOnDisk, calendarNumber);
-				return;
-			} else {
-				// Get next cache update time
-				var checkNextCacheTimeThenProceed = function() {
-					var nextCacheDate = getNextCacheTime(fileOnDisk, calendarData[calendarNumber]);
-					if (nextCacheDate) {
-						cacheImmediatelyAfter = nextCacheDate.getTime();
-					}
-					return;
-				}
-				console.log("Reading from filesystem: " + fileOnDisk);
-				readFilesystemCalendar(checkNextCacheTimeThenProceed, configNode, calendarNumber);
-				return;
-			}
+	
+	if (fs.existsSync(fileOnDisk)) {
+		if (isFileLoaded(configNode) && cachedFileExpired(configNode)) {
+			console.log("Cache file " + fileOnDisk + " has expired.");
+			await readFromUrlAndWriteToCache(configNode);
+			return;
 		} else {
-			await readFromUrlAndWriteToCache(urlToRetrieve, fileOnDisk, calendarNumber);
+			console.log("Reading from filesystem: " + fileOnDisk);
+			await readFilesystemCalendar(configNode);
 			return;
 		}
-	}
-	else {
+	} else {
+		await readFromUrlAndWriteToCache(configNode);
 		return;
 	}
 	console.debug("No path followed, calling not-cached method " + onDataNotCached + " with params " + urlToRetrieve + ", " + fileOnDisk);
-	await readFromUrlAndWriteToCache(urlToRetrieve, fileOnDisk, calendarNumber);
+	await readFromUrlAndWriteToCache(configNode);
 };
 
 exports.getCachedData = async function() {
 	for (var nodeNumber = 0;nodeNumber < config.calendars.length;nodeNumber++) {
-		await exports.checkDataCached(config.calendars[nodeNumber], nodeNumber);
+		await exports.checkDataCachedForConfig(config.calendars[nodeNumber]);
 	}
 	return;
 };
@@ -225,7 +284,7 @@ function dueForFinish(match) {
 function getEarliestMatchTime(matches) {
 	var earliest = -1;
 	for (var i = 0;i < matches.length;i++) {
-		if (earliest < 0 || matches[i].endDateTS < earliest) {
+		if (earliest < 0 || matches[i].endDateTS < earliest && matches[i].endDateTS < earliest > 0) {
 			earliest = matches[i].endDateTS;
 		}
 	}
@@ -240,7 +299,7 @@ function parseStageInto(stage, ical, options) {
 		if (currentMatch.startDate) {
 			parseMatchesInto(stage.name, currentMatch, ical, options);
 			if (dueForFinish(currentMatch)) {
-				matches.push(currentMatch);
+				dueForCompletionMatches.push(currentMatch);
 			}
 		}
 	}
@@ -412,20 +471,35 @@ function getTtl() {
 	}
 }
 
+function includeLeague(options, loadedItem) {
+	var league = loadedItem.config.tag;
+	var filteredLeagues = options.leagues;
+	if (options.showDefaultLeagues()) {
+		console.log("league=" + loadedItem.config.default + " for " + loadedItem.config.name + " because no leagues param provided.");
+		return loadedItem.config.default;
+	} else if (filteredLeagues.indexOf(league) !== -1) {
+		return true;
+	}
+	return false;
+}
+
 function buildCalendar(options) {
 	var ttl = getTtl();
 	var ical = icalgen().ttl(ttl);
 	ical.domain(calendarDomain);
 	ical.name(calendarName);
 	
-	console.log(calendarData.length + " calendars loaded.");
+	console.log(loadedData.length + " calendars loaded.");
 
-	for (var cal = 0;cal < calendarData.length;cal++) {
-		console.log("Adding data from calendar " + cal);
-		var currentCal = calendarData[cal];
-		var stages = currentCal.data.stages;
-		for (var i = 0;i < stages.length;i++) {
-			parseStageInto(stages[i], ical, options);
+	for (var cal = 0;cal < loadedData.length;cal++) {
+		var loadedItem = loadedData[cal];
+		if (includeLeague(options, loadedItem)) {
+			console.log("Adding data from calendar " + loadedItem.config.name);
+			var currentCal = loadedItem.calendar;
+			var stages = currentCal.data.stages;
+			for (var i = 0;i < stages.length;i++) {
+				parseStageInto(stages[i], ical, options);
+			}
 		}
 	}
 	return ical;
@@ -497,6 +571,14 @@ function getFilteredTeams(pars) {
 	return teams;
 }
 
+function getFilteredLeagues(pars) {
+	var leagues = null;
+	if (pars.leagues) {
+		leagues = pars.leagues.split(',');
+	}
+	return leagues;
+}
+
 function strcasecmp(string1, string2) {
 	if (string1 == null && string2 == null) {
 		return true;
@@ -516,16 +598,24 @@ async function ensureDataLoaded() {
 
 function createOptionsFromPars(pars) {
 	var teams = getFilteredTeams(pars);
+	var leagues = getFilteredLeagues(pars);
 	var options = {
 		format: pars.format == null || (pars.format != null && strcasecmp(pars.format, PARAM_FORMAT_DETAILED) ? FORMAT_DETAILED : FORMAT_REGULAR),
 		scores: pars.scores != null && (strcasecmp(pars.scores, PARAM_SCORES_SHOW) || strcasecmp(pars.scores, "true")) ? SHOW_SCORES : 0,
 		teams: teams,
+		leagues: leagues,
 		
 		showDetailedSummary: function() {
 			return this.format == FORMAT_DETAILED;
 		},
 		showAllTeams: function() {
 			if (this.teams == null || this.teams.length <= 0) {
+				return true;
+			}
+			return false;
+		},
+		showDefaultLeagues: function() {
+			if (this.leagues == null || this.leagues.length <= 0) {
 				return true;
 			}
 			return false;
