@@ -6,6 +6,7 @@
 		<h1>Overwatch League ICS calendar</h1>
 		<h2>Recent fixes and additions</h2>
 		<ul>
+			<li>12/07/2018 - Added support for limiting contenders data to regions.</li>
 			<li>7/07/2018 - Added functionality to get multiple calendars and contenders calendars.</li>
 			<li>17/06/2018 - The calendar will now referesh its own cache immediately after any future match was scheduled to end to attempt to get the latest data immediately.</li>
 			<li>15/06/2018 - Fixed an issue with the proxy that was always giving people the detfault data feed and where it was ignoring the parameters passed to the script.</li>
@@ -42,9 +43,22 @@
 				<li>CS1 - Overwatch Contenders - Season 1</li>
 			</ul>
 		</p>
-		<p>For example, for a feed with detailed info, showing scores, for all Overwatch Contenders Season 1 and 2 matches, use <a href="/calendar?format=detailed&scores=true&leagues=CS1,CS2">/calendar?format=detailed&scores=true&leagues=CS1,CS2</a></p>
-		<p>Say you wanted a calendar with only games featuring the Sydney Drop Bears in Contenders Season 2, you could use <a href="/calendar?scores=true&leagues=CS2&teams=SDB">/calendar?scores=true&leagues=CS2&teams=SDB</a></p>
+		<p>For example, for a feed with detailed info, showing scores, for all Overwatch Contenders Season 1 and 2 matches, use <a href="/calendar?format=detailed&scores=true&leagues=CS1,CS2">/calendar?format=detailed&amp;scores=true&leagues=CS1,CS2</a></p>
+		<p>Say you wanted a calendar with only games featuring the Sydney Drop Bears in Contenders Season 2, you could use <a href="/calendar?scores=true&leagues=CS2&teams=SDB">/calendar?scores=true&leagues=CS2&amp;teams=SDB</a></p>
 		<p>When more data becomes available, functionality will be added for World Cup games.  This league will likely be OWC2018.</p>
+		<h3>Limiting to regions</h3>
+		<p>Contenders calendars can also be limited to regions using the <strong>regions</strong> parameter.  Valid regions are:
+			<ul>
+				<li>OC/AUS - Australia</li>
+				<li>CN - China</li>
+				<li>EU - Europe</li>
+				<li>KR - Korea</li>
+				<li>NA - North America</li>
+				<li>AS/PAC - Pacific</li>
+				<li>SA - South America</li>
+			</ul>
+		</p>
+		<p>For example, to return all matches in Contenders seasons 1 and 2 for Korea and China only, you could use <a href="/calendar?scores=true&leagues=CS1,CS2&regions=KR,CN">/calendar?scores=true&leagues=CS1,CS2&amp;regions=KR,CN</a></p>
 		<h3>Match text format</h3>
 		<p>The default short format is <strong>OWL LAV v SHD</strong>. Adding the value <strong>format=detailed</strong> will show extended detail for the calendar event item, and the output format will become <strong>Stage 4 - Los Angeles Valiant vs Shanghai Dragons</strong></p>
 		<p>eg, <strong><a href="/calendar?teams=SHD,LAV&amp;format=detailed">/calendar?teams=SHD,LAV&amp;format=detailed</a></strong></p>

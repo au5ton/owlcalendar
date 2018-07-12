@@ -17,7 +17,16 @@
 			"displayName": "Overwatch Contenders - 2018 Season 2",
 			"url": "https://overwatch-contenders-api-prod.playoverwatch.com/schedule?expand=team.content&locale=en_US&season=2018S2",
 			"cache": "contenders2.js",
-			"default": false
+			"default": false,
+			"regions" : [
+				{	"tournamentId" : 4293, "region": "OC", "abbreviation" : "AUS", "name": "Australia"},
+				{	"tournamentId" : 4332, "region": "CN", "abbreviation" : "CN", "name": "China"},
+				{	"tournamentId" : 4300, "region": "EU", "abbreviation" : "EU", "name": "Europe"},
+				{	"tournamentId" : 4271, "region": "KR", "abbreviation" : "KR", "name": "Korea"},
+				{	"tournamentId" : 4340, "region": "NA", "abbreviation" : "NA", "name": "North America"},
+				{	"tournamentId" : 4273, "region": "AS", "abbreviation" : "PAC", "name": "Pacific"},
+				{	"tournamentId" : 4332, "region": "SA", "abbreviation" : "SA", "name": "South America"}
+			]
 		},
 		{
 			"tag": "CS1",
@@ -25,7 +34,16 @@
 			"displayName": "Overwatch Contenders - 2018 Season 1",
 			"url": "https://overwatch-contenders-api-prod.playoverwatch.com/schedule?expand=team.content&locale=en_US&season=2018S1",
 			"cache": "contenders1.js",
-			"default": false
+			"default": false,
+			"regions" : [
+				{	"tournamentId" : 3981, "region": "OC", "abbreviation" : "AUS", "name": "Australia"},
+				{	"tournamentId" : 3979, "region": "CN", "abbreviation" : "CN", "name": "China"},
+				{	"tournamentId" : 3978, "region": "EU", "abbreviation" : "EU", "name": "Europe"},
+				{	"tournamentId" : 3974, "region": "KR", "abbreviation" : "KR", "name": "Korea"},
+				{	"tournamentId" : 3980, "region": "NA", "abbreviation" : "NA", "name": "North America"},
+				{	"tournamentId" : 3982, "region": "AS", "abbreviation" : "PAC", "name": "Pacific"},
+				{	"tournamentId" : 3983, "region": "SA", "abbreviation" : "SA", "name": "South America"}
+			]
 		}
 	]
 }

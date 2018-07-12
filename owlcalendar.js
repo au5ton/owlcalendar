@@ -296,10 +296,13 @@ function parseStageInto(stage, ical, options) {
 	var dueForCompletionMatches = [];
 	for (var i = 0;i < matches.length;i++) {
 		var currentMatch = matches[i];
-		if (currentMatch.startDate) {
-			parseMatchesInto(stage.name, currentMatch, ical, options);
-			if (dueForFinish(currentMatch)) {
-				dueForCompletionMatches.push(currentMatch);
+		var showMatch = shouldShowMatch(options, currentMatch);
+		if (showMatch) {
+			if (currentMatch.startDate) {
+				parseMatchesInto(stage.name, currentMatch, ical, options);
+				if (dueForFinish(currentMatch)) {
+					dueForCompletionMatches.push(currentMatch);
+				}
 			}
 		}
 	}
@@ -395,7 +398,49 @@ function getMatchDescriptionString(options, stageName, match, compet1, compet2) 
 	return description;
 }
 
-function shouldShowMatch(options, competitors) {
+function hasConfTourneyId(region, tourneyId) {
+	var returnVal = false;
+	config.calendars.forEach((confCalendar)=>{
+		if (confCalendar.regions) {
+			confCalendar.regions.forEach((confCalRegion)=>{
+				var confCalRegionRegion = confCalRegion.region;
+				var confCalRegionAbbr = confCalRegion.abbreviation;
+				var confCalRegionTourneyId = confCalRegion.tournamentId;
+				
+				if (strcasecmp(region, confCalRegionRegion) || strcasecmp(region, confCalRegionAbbr))
+				{
+					if (tourneyId === confCalRegionTourneyId) {
+						returnVal = true;
+					}
+				}
+			});
+		}
+	});
+	return returnVal;
+}
+
+function includeMatchRegion(options, match) {
+	var includeThisMatch = false;
+	if (options.showAllRegions()) {
+		includeThisMatch = true;
+	} else {
+		var matchTournamentId = match.tournament.id;
+		options.regions.forEach((optRegion)=>{
+			var regionName = optRegion;
+			var confRegionHasTourneyId = hasConfTourneyId(regionName, matchTournamentId);
+			if (confRegionHasTourneyId) {
+				includeThisMatch = true;
+			}
+		});
+	}
+	return includeThisMatch;
+}
+
+function shouldShowMatch(options, match) {
+	if (!match.startDate) {
+		return false;
+	}
+	var competitors = match.competitors;
 	var filteredTeams = options.teams;
 	var showMatch = true;
 	if (options.showAllTeams()) {
@@ -410,6 +455,11 @@ function shouldShowMatch(options, competitors) {
 		else {
 			showMatch = false;
 		}
+	}
+	
+	if (!options.showAllRegions() && showMatch) {
+		var includeRegion = includeMatchRegion(options, match);
+		showMatch = includeRegion;
 	}
 	return showMatch;
 }
@@ -429,22 +479,18 @@ function parseMatchesInto(stageName, match, ical, options) {
 		//var abbr1 = getAbbreviatedName(competitors[0]);
 		//var abbr2 = getAbbreviatedName(competitors[1]);
 		
-		var showMatch = shouldShowMatch(options, competitors);
+		var summary = getMatchSummaryString(options, stageName, match, competitors[0], competitors[1]);
+		var description = getMatchDescriptionString(options, stageName, match, competitors[0], competitors[1]);
 		
-		if (showMatch) {
-			var summary = getMatchSummaryString(options, stageName, match, competitors[0], competitors[1]);
-			var description = getMatchDescriptionString(options, stageName, match, competitors[0], competitors[1]);
-			
-			var event = ical.createEvent({
-				id: match.id,
-				summary: summary,
-				description: description,
-				start: match.startDate,
-				end: match.endDate,
-				sequence: match.id,
-				location: match.tournament.location
-			});
-		}
+		var event = ical.createEvent({
+			id: match.id,
+			summary: summary,
+			description: description,
+			start: match.startDate,
+			end: match.endDate,
+			sequence: match.id,
+			location: match.tournament.location
+		});
 	}
 }
 
@@ -579,6 +625,14 @@ function getFilteredLeagues(pars) {
 	return leagues;
 }
 
+function getFilteredRegions(pars) {
+	var regions = null;
+	if (pars.regions) {
+		regions = pars.regions.split(',');
+	}
+	return regions;
+}
+
 function strcasecmp(string1, string2) {
 	if (string1 == null && string2 == null) {
 		return true;
@@ -599,11 +653,14 @@ async function ensureDataLoaded() {
 function createOptionsFromPars(pars) {
 	var teams = getFilteredTeams(pars);
 	var leagues = getFilteredLeagues(pars);
+	var regions = getFilteredRegions(pars);
+	
 	var options = {
 		format: pars.format == null || (pars.format != null && strcasecmp(pars.format, PARAM_FORMAT_DETAILED) ? FORMAT_DETAILED : FORMAT_REGULAR),
 		scores: pars.scores != null && (strcasecmp(pars.scores, PARAM_SCORES_SHOW) || strcasecmp(pars.scores, "true")) ? SHOW_SCORES : 0,
 		teams: teams,
 		leagues: leagues,
+		regions: regions,
 		
 		showDetailedSummary: function() {
 			return this.format == FORMAT_DETAILED;
@@ -616,6 +673,12 @@ function createOptionsFromPars(pars) {
 		},
 		showDefaultLeagues: function() {
 			if (this.leagues == null || this.leagues.length <= 0) {
+				return true;
+			}
+			return false;
+		},
+		showAllRegions: function() {
+			if (this.regions == null || this.regions.length <= 0) {
 				return true;
 			}
 			return false;
