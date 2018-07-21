@@ -44,6 +44,14 @@
 				{	"tournamentId" : 3982, "region": "AS", "abbreviation" : "PAC", "name": "Pacific"},
 				{	"tournamentId" : 3983, "region": "SA", "abbreviation" : "SA", "name": "South America"}
 			]
+		},
+		{
+			"tag": "OWC",
+			"name": "wc18rr",
+			"displayName": "Overwatch World Cup 2018",
+			"url": "https://worldcup.playoverwatch.com/en-us/ajax/round-robin?year=2018",
+			"cache": "worldcup18rr.js",
+			"default": true
 		}
 	]
 }

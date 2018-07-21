@@ -133,9 +133,7 @@ function getNextMatchCompletion(calendarData) {
 	var nonConcludedMatches = [];
 	if (!calendarData) {
 		throw Error('Null param passed in to getNextMatchCompletion');
-	} else if (!calendarData.data) {
-		console.trace("Loaded data array does not contain calendar but was " + calendarData);
-	} else {
+	} else if (calendarData.data && calendarData.data.stages) {
 		var stages = calendarData.data.stages;
 		
 		for (var i = 0;i < stages.length;i++) {
@@ -151,6 +149,22 @@ function getNextMatchCompletion(calendarData) {
 	
 		var earliestMatch = getEarliestMatchTime(nonConcludedMatches);
 		return earliestMatch;
+	} else if (calendarData.brackets) {
+		console.log("Parsing as World Cup round-robin data.");
+		var brackets = calendarData.brackets;
+		
+		for (var i = 0;i < brackets.length;i++) {
+			var bracket = brackets[i];
+			var matches = bracket.matches;
+			for (var j = 0;j < matches.length;j++) {
+				var match = matches[j];
+				if (!strcasecmp("CONCLUDED", match.state)) {
+					nonConcludedMatches.push(match);
+				}
+			}
+		}
+	} else if (!calendarData.data && !calendarData.brackets) {
+		console.trace("Loaded data array does not contain calendar but was " + calendarData);
 	}
 }
 
@@ -291,15 +305,14 @@ function getEarliestMatchTime(matches) {
 	return earliest;
 }
 
-function parseStageInto(stage, ical, options) {
-	var matches = stage.matches;
+function parseContainerMatchesInto(matches, ical, options, stageName) {
 	var dueForCompletionMatches = [];
 	for (var i = 0;i < matches.length;i++) {
 		var currentMatch = matches[i];
 		var showMatch = shouldShowMatch(options, currentMatch);
 		if (showMatch) {
 			if (currentMatch.startDate) {
-				parseMatchesInto(stage.name, currentMatch, ical, options);
+				parseMatchesInto(stageName, currentMatch, ical, options);
 				if (dueForFinish(currentMatch)) {
 					dueForCompletionMatches.push(currentMatch);
 				}
@@ -310,6 +323,16 @@ function parseStageInto(stage, ical, options) {
 		var earliestMatchTime = getEarliestMatchTime(dueForCompletionMatches);
 		cacheImmediatelyAfter = earliestMatchTime;
 	}
+}
+
+function parseBracketInto(bracket, ical, options) {
+	var matches = bracket.matches;
+	parseContainerMatchesInto(matches, ical, options, bracket.name);
+}
+
+function parseStageInto(stage, ical, options) {
+	var matches = stage.matches;
+	parseContainerMatchesInto(matches, ical, options, stage.name);
 }
 
 function getAbbreviatedName(competitor) {
@@ -381,7 +404,7 @@ function getScoreLine(match, scoreIndex) {
 
 function getMatchDescriptionString(options, stageName, match, compet1, compet2) {
 	var description = stageName;
-	if (match.tournament.type == 'PLAYOFFS') {
+	if (match.tournamen && match.tournament.type == 'PLAYOFFS') {
 		description += ' Playoffs';
 	}
 	var comp1 = compet1 == null ? "TBA" : compet1.name;
@@ -481,15 +504,28 @@ function parseMatchesInto(stageName, match, ical, options) {
 		
 		var summary = getMatchSummaryString(options, stageName, match, competitors[0], competitors[1]);
 		var description = getMatchDescriptionString(options, stageName, match, competitors[0], competitors[1]);
+		var eventLocation = 'Unknown';
+		if (match.tournament && match.tournament.location) {
+			eventLocation = match.tournament.location;
+		}
+		
+		var startDate;
+
+		if (match.startDate.timestamp) {
+			var tmpDate = Date(match.startDate.timestamp);
+			startDate = tmpDate;
+		} else {
+			startDate = match.startDate;
+		}
 		
 		var event = ical.createEvent({
 			id: match.id,
 			summary: summary,
 			description: description,
-			start: match.startDate,
+			start: startDate,
 			end: match.endDate,
 			sequence: match.id,
-			location: match.tournament.location
+			location: eventLocation
 		});
 	}
 }
@@ -542,9 +578,17 @@ function buildCalendar(options) {
 		if (includeLeague(options, loadedItem)) {
 			console.log("Adding data from calendar " + loadedItem.config.name);
 			var currentCal = loadedItem.calendar;
-			var stages = currentCal.data.stages;
-			for (var i = 0;i < stages.length;i++) {
-				parseStageInto(stages[i], ical, options);
+			
+			if (currentCal.data && currentCal.data.stages) {
+				var stages = currentCal.data.stages;
+				for (var i = 0;i < stages.length;i++) {
+					parseStageInto(stages[i], ical, options);
+				}
+			} else if (currentCal.brackets) {
+				var brackets = currentCal.brackets;
+				for (var i = 0;i < brackets.length;i++) {
+					parseBracketInto(brackets[i], ical, options);
+				}
 			}
 		}
 	}
