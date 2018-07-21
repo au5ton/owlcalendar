@@ -367,7 +367,7 @@ function getMatchSummaryString(options, stageName, match, compet1, compet2) {
 	var summary;
 	if (options.showDetailedSummary()) {
 		summary = stageName;
-		if (match.tournament.type == 'PLAYOFFS') {
+		if (match.tournament && match.tournament.type == 'PLAYOFFS') {
 			summary += ' Playoffs';
 		}
 		var comp1 = compet1 == null ? "TBA" : compet1.name + score1;
