@@ -526,8 +526,8 @@ function parseMatchesInto(stageName, match, ical, options) {
 		var startDate;
 
 		if (match.startDate.timestamp) {
-			var tmpDate = Date(match.startDate.timestamp);
-			startDate = tmpDate;
+			var tmpDate = new Date(match.startDate.timestamp);
+			startDate = tmpDate.toISOString();
 		} else {
 			startDate = match.startDate;
 		}
