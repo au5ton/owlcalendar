@@ -5,6 +5,7 @@ var icalgen = require('ical-generator');
 var request = require('request');
 var getIP = require('ipware')().get_ip;
 var url = require('url');
+var md5 = require('md5');
 
 const cacheHours = 12;
 const maxCacheTime = cacheHours * 60 * 60 * 1000;
@@ -26,6 +27,10 @@ var cacheImmediatelyAfter = -1;
 
 var config;
 var exports = module.exports = {};
+
+function generateCalId() {
+	
+}
 
 function findLoadedDataIndex(name) {
 	for (var i = 0;i < loadedData.length;i++) {
@@ -487,6 +492,15 @@ function shouldShowMatch(options, match) {
 	return showMatch;
 }
 
+function generateMatchSequence(match, stageName, options) {
+	var competitors = match.competitors;
+	var strForHash = match.startDate.day + ":" + getMatchSummaryString(options, stageName, match, competitors[0], competitors[1]);
+	var digest = md5(strForHash);
+	var digestHex = digest.substring(0, 4);
+	var digestInt = parseInt("0x" + digestHex);
+	return digestInt;
+}
+
 function parseMatchesInto(stageName, match, ical, options) {
 	if (!match.startDate) {
 		throw Error("Match does not have a start date, to can't be created as a calendar event.");
@@ -517,14 +531,21 @@ function parseMatchesInto(stageName, match, ical, options) {
 		} else {
 			startDate = match.startDate;
 		}
+
+		var seq;
+		if (match.id) {
+			seq = match.id;
+		} else {
+			seq = generateMatchSequence(match, stageName, options);
+		}
 		
 		var event = ical.createEvent({
-			id: match.id,
+			id: seq,
 			summary: summary,
 			description: description,
 			start: startDate,
 			end: match.endDate,
-			sequence: match.id,
+			sequence: seq,
 			location: eventLocation
 		});
 	}
