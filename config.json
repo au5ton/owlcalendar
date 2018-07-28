@@ -9,7 +9,8 @@
 			"displayName": "Overwatch League 2018 Season",
 			"url": "https://api.overwatchleague.com/schedule?expand=team.content&locale=en_US",
 			"cache": "owlcache.js",
-			"default": true
+			"default": true,
+			"final": false
 		},
 		{
 			"tag": "CS2",
@@ -26,7 +27,8 @@
 				{	"tournamentId" : 4340, "region": "NA", "abbreviation" : "NA", "name": "North America"},
 				{	"tournamentId" : 4273, "region": "AS", "abbreviation" : "PAC", "name": "Pacific"},
 				{	"tournamentId" : 4332, "region": "SA", "abbreviation" : "SA", "name": "South America"}
-			]
+			],
+			"final": false
 		},
 		{
 			"tag": "CS1",
@@ -43,7 +45,17 @@
 				{	"tournamentId" : 3980, "region": "NA", "abbreviation" : "NA", "name": "North America"},
 				{	"tournamentId" : 3982, "region": "AS", "abbreviation" : "PAC", "name": "Pacific"},
 				{	"tournamentId" : 3983, "region": "SA", "abbreviation" : "SA", "name": "South America"}
-			]
+			],
+			"final": true
+		},
+		{
+			"tag": "OWC17",
+			"name": "wc17rr",
+			"displayName": "Overwatch World Cup 2018",
+			"url": "https://worldcup.playoverwatch.com/en-us/ajax/round-robin?year=2017",
+			"cache": "worldcup17rr.js",
+			"default": false,
+			"final": true
 		},
 		{
 			"tag": "OWC",
@@ -51,7 +63,8 @@
 			"displayName": "Overwatch World Cup 2018",
 			"url": "https://worldcup.playoverwatch.com/en-us/ajax/round-robin?year=2018",
 			"cache": "worldcup18rr.js",
-			"default": true
+			"default": true,
+			"final": false
 		}
 	]
 }

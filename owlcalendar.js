@@ -28,10 +28,6 @@ var cacheImmediatelyAfter = -1;
 var config;
 var exports = module.exports = {};
 
-function generateCalId() {
-	
-}
-
 function findLoadedDataIndex(name) {
 	for (var i = 0;i < loadedData.length;i++) {
 		var node = loadedData[i];
@@ -57,8 +53,11 @@ function isFileLoaded(configNode) {
 	return findLoadedData(configNode.name) != undefined;
 }
 
-
 function addLoadedData(calendarDataObj, timeLoaded, configItem) {
+	var noRefresh = false;
+	if (configItem.final) {
+		noRefresh = true;
+	}
 	var nextCacheTime = getNextCacheTime(configItem.cache, calendarDataObj);
 	if (!nextCacheTime) {
 		console.debug("Could not determine a next time to refresh cache for " + configItem.name);
@@ -67,7 +66,8 @@ function addLoadedData(calendarDataObj, timeLoaded, configItem) {
 		calendar: calendarDataObj,
 		timeLoaded: timeLoaded,
 		config: configItem,
-		nextCacheTime: nextCacheTime
+		nextCacheTime: nextCacheTime,
+		noRefresh: noRefresh
 	};
 	
 	var index = findLoadedDataIndex(configItem.name);
@@ -216,7 +216,9 @@ async function readFilesystemCalendar(configNode) {
 				var calData = JSON.parse(data);
 				var timeNow = new Date().getTime();
 				var nodeItem = addLoadedData(calData, timeNow, configNode);
-				if (nodeItem.nextCacheTime && timeNow > nodeItem.nextCacheTime) {
+				if (configNode.final) {
+					console.log("Calendar exists on filesystem at " + targetOnFilesystem + " and is set to final, no refresh to be requested.")
+				} else if (nodeItem.nextCacheTime && timeNow > nodeItem.nextCacheTime) {
 					console.log("Calendar data on filesystem at " + targetOnFilesystem + " requires refresh.");
 					readFromUrlAndWriteToCache(configNode);
 				}
@@ -240,8 +242,11 @@ exports.getDataFromFilesystem = function(onDataReadComplete) {
 };
 
 function cachedFileExpired(configItem) {
-	var dataItem = findLoadedData(configItem.name);
 	var cachedFile = configItem.cache;
+	if (fs.existsSync(cachedFile) && configItem.final) {
+		return false;
+	}
+	var dataItem = findLoadedData(configItem.name);
 	var timeNow = new Date();
 	if (dataItem.nextCacheTime && dataItem.nextCacheTime > 0 && timeNow.getTime() > dataItem.nextCacheTime) {
 		var cachedRequestedAt = new Date(0);
