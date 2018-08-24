@@ -109,10 +109,20 @@ if (!Array.prototype.indexOf) {
 async function readFromUrlAndWriteToCache(configNode) {
 	var urlToRetrieve = configNode.url;
 	var writeTo = configNode.cache;
-	
+	var rejectUnauthorized = true;
+	if (configNode.rejectUnauthorized === false) {
+		rejectUnauthorized = false;
+	}
 	console.log("Reading remote calendar file from " + urlToRetrieve);
-	request(urlToRetrieve, function (error, calXhrResponse, body) {
-		if (body) {
+	request({
+		url: urlToRetrieve,
+		rejectUnauthorized: rejectUnauthorized
+		},
+		function (error, calXhrResponse, body) {
+		if (error) {
+			console.trace("Failed reading calendar data from " + urlToRetrieve + " Error: " + JSON.stringify(error));
+			return;
+		} else if (body) {
 			var calDataObj = JSON.parse(body);
 			var timeNow = new Date();
 			var dataNode = addLoadedData(calDataObj, timeNow, configNode);
@@ -196,7 +206,7 @@ function getNextCacheTime(targetFile, calendarData) {
 		console.log("Next match is scheduled to end before cache expiry at " + utcMatchTime);
 		return utcMatchTime;
 	} else {
-		console.log("There was a problem getting cache expiry for " + targetFile + " with file expiry of " + fileExpiryLocal + " and match completion of " + utcMatchTime);
+		console.log("There was a problem getting cache expiry for " + targetFile + " with file expiry of " + fileExpiryLocal + " and match completion of " + utcMatchTime + "(" + nextMatchCompetionUTCEpoch + ")");
 		return fileExpiryLocal;
 	}
 }
@@ -308,7 +318,7 @@ function dueForFinish(match) {
 function getEarliestMatchTime(matches) {
 	var earliest = -1;
 	for (var i = 0;i < matches.length;i++) {
-		if (earliest < 0 || matches[i].endDateTS < earliest && matches[i].endDateTS < earliest > 0) {
+		if (matches[i].endDateTS && earliest < 0 || matches[i].endDateTS < earliest && matches[i].endDateTS < earliest > 0) {
 			earliest = matches[i].endDateTS;
 		}
 	}

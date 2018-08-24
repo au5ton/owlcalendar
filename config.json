@@ -28,7 +28,8 @@
 				{	"tournamentId" : 4273, "region": "AS", "abbreviation" : "PAC", "name": "Pacific"},
 				{	"tournamentId" : 4332, "region": "SA", "abbreviation" : "SA", "name": "South America"}
 			],
-			"final": false
+			"final": false,
+			"rejectUnauthorized": false
 		},
 		{
 			"tag": "CS1",
@@ -46,7 +47,8 @@
 				{	"tournamentId" : 3982, "region": "AS", "abbreviation" : "PAC", "name": "Pacific"},
 				{	"tournamentId" : 3983, "region": "SA", "abbreviation" : "SA", "name": "South America"}
 			],
-			"final": true
+			"final": true,
+			"rejectUnauthorized": false
 		},
 		{
 			"tag": "OWC17",
